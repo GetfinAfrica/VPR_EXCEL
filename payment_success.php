@@ -29,7 +29,8 @@ $methodNames=['ecocash'=>'EcoCash','onemoney'=>'OneMoney','innbucks'=>'InnBucks'
 <div><dt>Paynow reference</dt><dd><?=htmlspecialchars((string)$payment['paynow_reference'])?></dd></div>
 <div class="vpr-wide"><dt>VPR payment reference</dt><dd><?=htmlspecialchars($payment['merchant_reference'])?></dd></div>
 </dl>
-<div class="vpr-actions"><a id="viewCertificate" href="<?=htmlspecialchars($certificate)?>">View certificate</a><a class="vpr-secondary" href="index.php">New vehicle check</a></div>
+<div class="vpr-actions"><a id="viewCertificate" href="<?=htmlspecialchars($certificate)?>" target="_blank" rel="noopener" aria-label="View certificate (opens in a new tab)">View certificate ↗</a><a class="vpr-secondary" href="index.php">New vehicle check</a></div>
+<p style="font-size:12px;color:#687481">The certificate opens in a new tab. This acknowledgement stays open here.</p>
 <script>try{sessionStorage.removeItem('vpr.pendingCheckout');sessionStorage.removeItem('vpr.checkoutRequest');}catch(e){}</script>
 <?php elseif($authorized): ?>
 <p>VPR has not yet verified a successful payment for this reference. Your certificate is available only after verification.</p>

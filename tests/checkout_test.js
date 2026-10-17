@@ -8,7 +8,7 @@ function fixture({saved = null, request = null, blocked = false, fail = false, s
   let nextTimer=0;
   if (saved) store.set('vpr.pendingCheckout', JSON.stringify(saved));
   if (request) store.set('vpr.checkoutRequest', JSON.stringify(request));
-  function node() { return {style: {}, handlers: {}, value: '', addEventListener(k, fn) {this.handlers[k] = fn;}, click(){return this.handlers.click?.();}, append() {}, remove() {}}; }
+  function node() { return {style: {}, handlers: {}, attributes:{},value: '',setAttribute(k,v){this.attributes[k]=v;},focus(){}, addEventListener(k, fn) {this.handlers[k] = fn;}, click(){return this.handlers.click?.();}, append() {}, remove() {}}; }
   const names = ['csrf_token', 'checkout_key', 'registration_number', 'vehicle_brand', 'vehicle_model', 'payment_currency','payment_method','payer_phone'];
   const fields = Object.fromEntries(names.map(n => [n, {value: n === 'payment_currency' ? 'USD' : (n === 'checkout_key' ? 'a'.repeat(32) : 'fixture')}]));
   const form = node();
@@ -62,7 +62,7 @@ function fixture({saved = null, request = null, blocked = false, fail = false, s
   assert(blocked.window.location.href.startsWith('https://www.paynow.co.zw/')); ++checks;
   const recovered = fixture({saved: {reference:'VPR-old', token:'old-token'}});
   assert(!recovered.events.some(e => e.startsWith('fetch:'))); ++checks;
-  await recovered.click('vprPayButton'); assert.equal(recovered.nodes.get('vprPayModal').style.display,'flex');assert(recovered.nodes.get('vprOpenPaynow').hidden);assert(!recovered.events.includes('fetch:paynow_create.php')); ++checks;
+  assert.equal(recovered.nodes.get('vehicleTab').attributes['aria-selected'],'true');await recovered.click('paymentTab');await recovered.click('vprPayButton'); assert.equal(recovered.nodes.get('vprPayModal').style.display,'flex');assert(recovered.nodes.get('vprOpenPaynow').hidden);assert(!recovered.events.includes('fetch:paynow_create.php')); ++checks;
   const lost = fixture({request: {checkout_key:'b'.repeat(32), fields:{payment_currency:'ZWG',registration_number:'TST1234'}}});
   assert.equal(lost.fields.checkout_key.value, 'b'.repeat(32)); assert.equal(lost.fields.payment_currency.value,'ZWG'); ++checks;
   const failure = fixture({fail:true}); await failure.click('vprContinue'); await failure.click('vprPayButton'); await failure.click('vprOpenPaynow');

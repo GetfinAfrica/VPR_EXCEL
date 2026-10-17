@@ -52,7 +52,7 @@ try{
         $q='?ref='.urlencode($p['merchant_reference']).'&token='.urlencode($p['return_token']);
         [$code,$body]=request('/paynow_status.php'.$q);$result=json_decode($body,true);
         expect_http($code===200&&($result['paid']??false)&&!empty($result['certificate_url']),$ccy.' verified status releases certificate URL');
-        [$code,$ackBody]=request('/payment_success.php'.$ack);expect_http($code===200&&strpos($ackBody,'VPR acknowledges your successful payment')!==false&&strpos($ackBody,'id="viewCertificate"')!==false&&strpos($ackBody,$ccy.' '.($ccy==='USD'?'1.00':'2.00'))!==false,$ccy.' verified acknowledgement shows correct amount and explicit certificate link');
+        [$code,$ackBody]=request('/payment_success.php'.$ack);expect_http($code===200&&strpos($ackBody,'VPR acknowledges your successful payment')!==false&&strpos($ackBody,'id="viewCertificate"')!==false&&strpos($ackBody,'target="_blank" rel="noopener"')!==false&&strpos($ackBody,$ccy.' '.($ccy==='USD'?'1.00':'2.00'))!==false,$ccy.' verified acknowledgement shows correct amount and certificate link in a new tab');
         [$code]=request('/payment_success.php?ref='.$p['merchant_reference'].'&token=wrong');expect_http($code===403,'acknowledgement rejects wrong access token');
         [$code,$cert]=request('/'.$result['certificate_url']);expect_http($code===200&&strpos($cert,'TST1234')!==false,$ccy.' authorized certificate renders');
         $id=vpr_payment($pdo,$p['merchant_reference'])['search_id'];

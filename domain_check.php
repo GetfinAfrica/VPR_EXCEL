@@ -17,4 +17,4 @@ $checks[]=['Application security file', file_exists(__DIR__.'/.htaccess'), file_
 <body><div class="w"><div class="c"><?php vpr_page_heading("VPR Domain Readiness Check"); ?><p>This page checks the deployed VPR instance without sending information to any external security service.</p>
 <table><?php foreach($checks as $x): ?><tr><td><strong><?=$x[0]?></strong></td><td class="<?=$x[1]?'ok':'bad'?>"><?=$x[2]?></td></tr><?php endforeach;?></table>
 <p><strong>Detected secure base URL:</strong> <?=htmlspecialchars(vpr_public_base_url())?></p>
-<p><a href="admin2000.php">← Back to Admin Dashboard</a></p></div></div></body></html>
+<div class="vpr-actions"><a href="admin2000.php">← Back to Admin Dashboard</a></div></div></div></body></html>

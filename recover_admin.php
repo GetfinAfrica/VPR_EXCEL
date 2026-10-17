@@ -85,5 +85,5 @@ a{color:#062c52}
 </form>
 <?php endif; ?>
 
-<?php if($error || $message): ?><p><a href="admin2000.php">Return to Admin Login</a></p><?php endif; ?>
+<?php if($error || $message): ?><div class="vpr-actions"><a href="admin2000.php">Return to Admin Login</a></div><?php endif; ?>
 </div></body></html>

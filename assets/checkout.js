@@ -16,15 +16,25 @@
   let stage=1;
   const vehicleStage=document.getElementById('vehicleStage');
   const paymentStage=document.getElementById('paymentStage');
+  const vehicleTab=document.getElementById('vehicleTab'),paymentTab=document.getElementById('paymentTab');
   function showStage(next) {
     stage=next;vehicleStage.hidden=next!==1;paymentStage.hidden=next!==2;paymentStage.disabled=next!==2;
+    vehicleTab.setAttribute('aria-selected',String(next===1));paymentTab.setAttribute('aria-selected',String(next===2));
+    vehicleTab.tabIndex=next===1?0:-1;paymentTab.tabIndex=next===2?0:-1;
     document.getElementById('stageTitle').textContent=next===1?'Vehicle details':'Payment details';
     document.getElementById('stageProgress').textContent=next===1?'Step 1 of 2 — Vehicle':'Step 2 of 2 — Payment';
     document.getElementById('stageIntro').textContent=next===1?'Enter your vehicle details to begin the check.':'Choose the currency and payment method for your vehicle check.';
   }
-  function goToPayment(){if(form.reportValidity()){showStage(2);updateDetails();}}
+  function goToPayment(){if(stage===2)return;if(form.reportValidity()){showStage(2);updateDetails();paymentTab.focus();}}
+  vehicleTab.addEventListener('click',()=>{if(!busy)showStage(1);});
+  paymentTab.addEventListener('click',()=>{if(!busy)goToPayment();});
+  for(const tab of [vehicleTab,paymentTab])tab.addEventListener('keydown',function(event){
+    if(busy||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();const next=event.key==='Home'?1:(event.key==='End'?2:(stage===1?2:1));
+    if(next===1){showStage(1);vehicleTab.focus();}else goToPayment();
+  });
   document.getElementById('vprContinue').addEventListener('click',goToPayment);
-  document.getElementById('vprBack').addEventListener('click',()=>showStage(1));
+  document.getElementById('vprBack').addEventListener('click',()=>{showStage(1);vehicleTab.focus();});
   document.getElementById('test_scenario').addEventListener('change',function(){
     const value=this.value;
     if(testMode()&&['ecocash','onemoney'].includes(method.value)&&['0771111111','0772222222','0773333333','0774444444'].includes(value))document.getElementById('payer_phone').value=value;
@@ -75,6 +85,7 @@
   }
   function setBusy(on) {
     busy = on; open.disabled = on; trigger.disabled = on; close.disabled = on;
+    vehicleTab.disabled=on;paymentTab.disabled=on;
     document.getElementById('vprSpinner').style.display = on || watching ? 'block' : 'none';
     open.hidden=watching;
   }
@@ -105,7 +116,7 @@
     }
   } catch (_) {}
   updateDetails();
-  showStage(payment||savedRequest?2:1);
+  showStage(1);
   if (payment || savedRequest) {
     const recovery = document.createElement('p');
     const resume = document.createElement('a'); resume.href = payment ? returnUrl(payment) : '#vprSearchForm';

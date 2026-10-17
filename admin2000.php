@@ -289,11 +289,11 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
         <div class="vpr-price-note"><strong>0.00 = FREE.</strong> VPR bypasses Paynow and immediately issues the search certificate.</div>
       </div>
     </div>
-    <button type="submit">Save & Publish Search Prices</button>
+    <div class="vpr-actions"><button type="submit">Save & Publish Search Prices</button></div>
   </form>
 </div>
 
-<div class="panel"><h2>Add Vehicle Interest</h2><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="action" value="add_interest"><label>Registration Number</label><input name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="AAA1111"><label>Vehicle Brand</label><select name="vehicle_brand" required><option value="">Select vehicle brand</option><?php foreach($brands as $b): ?><option value="<?=htmlspecialchars($b)?>"><?=htmlspecialchars($b)?></option><?php endforeach;?></select><label>Vehicle Model</label><input name="vehicle_model" required placeholder="e.g. NV350"><label>Chassis Number (optional)</label><input name="chassis_number"><label>Interested Party</label><input name="interested_party" required placeholder="Bank, lender or secured party"><label>Reference / Note</label><textarea name="reference_note" rows="3"></textarea><button>Add Interest</button></form></div>
+<div class="panel"><h2>Add Vehicle Interest</h2><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="action" value="add_interest"><label>Registration Number</label><input name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="AAA1111"><label>Vehicle Brand</label><select name="vehicle_brand" required><option value="">Select vehicle brand</option><?php foreach($brands as $b): ?><option value="<?=htmlspecialchars($b)?>"><?=htmlspecialchars($b)?></option><?php endforeach;?></select><label>Vehicle Model</label><input name="vehicle_model" required placeholder="e.g. NV350"><label>Chassis Number (optional)</label><input name="chassis_number"><label>Interested Party</label><input name="interested_party" required placeholder="Bank, lender or secured party"><label>Reference / Note</label><textarea name="reference_note" rows="3"></textarea><div class="vpr-actions"><button>Add Interest</button></div></form></div>
 <div class="panel"><h2>Searches per day</h2><table><tr><th>Date</th><th>Searches</th></tr><?php foreach($daily as $d): ?><tr><td><?=htmlspecialchars($d['day'])?></td><td><?=intval($d['searches'])?></td></tr><?php endforeach;?><?php if(!$daily): ?><tr><td colspan="2">No searches yet.</td></tr><?php endif;?></table></div>
 </div>
 
@@ -315,7 +315,7 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
 <label>Period</label>
 <input name="stats_period" id="stats_period" value="<?=htmlspecialchars($statsPeriod)?>" required>
 </div>
-<button type="submit">Show Statistics</button>
+<div class="vpr-actions"><button type="submit">Show Statistics</button></div>
 </form>
 
 <div class="card" style="margin-top:14px;background:#f8fafc">
@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <p class="muted">Imports and merges a VPR Excel backup. Existing matching records are preserved or updated rather than blindly duplicated.</p>
       <form method="post" action="data_exchange.php?action=import" enctype="multipart/form-data" onsubmit="return confirm('Import this VPR Excel backup? Please make sure you have a current backup first.');">
         <input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="file" name="backup_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-        <button type="submit">Upload & Merge Excel Backup</button>
+        <div class="vpr-actions"><button type="submit">Upload & Merge Excel Backup</button></div>
       </form>
     </div>
   </div>
@@ -415,7 +415,7 @@ document.addEventListener('DOMContentLoaded',function(){
             <?=htmlspecialchars($h['result'])?>
           </td>
           <td class="certref"><?=htmlspecialchars(certificate_number_for_row($h))?></td>
-          <td><a class="viewbtn" href="certificate.php?id=<?=intval($h['id'])?>" target="_blank">View Certificate</a></td>
+          <td><a class="viewbtn" href="certificate.php?id=<?=intval($h['id'])?>" target="_blank" rel="noopener" aria-label="View certificate (opens in a new tab)">View Certificate ↗</a></td>
         </tr>
         <?php endforeach;?>
         <?php if(!$historyRows): ?><tr><td colspan="5">No search history found for this registration number.</td></tr><?php endif;?>
