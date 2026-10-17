@@ -1,0 +1,49 @@
+VPR V14.0 — FULL SYSTEM UPDATE / NEW DOMAIN READY
+===================================================
+
+THIS ZIP CONTAINS THE COMPLETE VPR APPLICATION FILE SET.
+
+MAJOR CHANGES
+1. HTTPS ONLY
+   - Plain HTTP is permanently redirected to HTTPS.
+   - HSTS is sent on HTTPS.
+   - Content Security Policy includes upgrade-insecure-requests.
+   - Security headers, clickjacking protection, MIME sniffing protection,
+     restrictive permissions policy, private-file blocking and directory blocking are included.
+   - No third-party security service is required by the application.
+
+2. DOMAIN PORTABILITY
+   - The public base URL is no longer hard-coded to vpr.co.zw.
+   - VPR derives the active HTTPS hostname from the deployed domain.
+   - This makes the package suitable for a new domain without editing application links.
+
+3. ADMIN DASHBOARD
+   - Refreshed dashboard styling.
+   - Prominent Search Price Management.
+   - Admin can set USD and ZiG independently.
+   - 0.00 means free/100% discount and bypasses Paynow completely.
+   - Existing analytics, registry management, payment information and data tools remain.
+
+4. DOMAIN READINESS
+   - Admin-only domain_check.php checks HTTPS detection, database presence/writability,
+     and local protection files.
+
+5. CERTIFICATE
+   - Existing V13.6/V13.7 one-page A4 print/PDF certificate retained.
+
+NEW DOMAIN DEPLOYMENT
+A. The new domain MUST have a valid SSL/TLS certificate installed at the hosting level.
+   VPR code can enforce HTTPS but cannot itself create the browser/server TLS certificate.
+B. Upload the complete contents of this ZIP to the new domain's public web root.
+C. If this is a fresh installation, the included data/vpr.sqlite provides the packaged database.
+D. If migrating the LIVE VPR registry, replace the packaged data/vpr.sqlite with your CURRENT
+   live database file so existing registry interests, searches and certificates move with you.
+E. Ensure PHP can write to the data directory while HTTP access to /data remains blocked.
+F. Visit /admin2000.php over HTTPS and log in.
+G. Open /domain_check.php from the dashboard to verify deployment.
+H. Change the administrator password from the default before production if not already changed.
+
+IMPORTANT
+- Do not serve the production site without a valid HTTPS certificate.
+- Do not expose config.php or data/vpr.sqlite.
+- Rotate any payment integration secret that has previously been shared outside secure server config.
