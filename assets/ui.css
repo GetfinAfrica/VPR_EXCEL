@@ -39,3 +39,8 @@
 @media(max-width:520px){.vpr-page-heading{gap:12px}.vpr-page-heading h1{font-size:22px}.vpr-page-heading .vpr-brand-logo{width:92px}.vpr-payment-box{padding:20px}.vpr-receipt{gap:16px;padding:16px}.vpr-print-actions{position:static;max-width:none;margin:12px}.vpr-actions{gap:8px}.vpr-actions>button,.vpr-actions>a{flex-basis:110px;padding:11px 10px;font-size:13px}}
 @media(max-width:520px){.vpr-form-grid{gap:2px 12px}.vpr-col-6{grid-column:span 12;padding:0}.vpr-col-12{padding:0}}
 @media print{.vpr-print-actions,.vpr-certificate-nav{display:none!important}.vpr-page-heading{break-inside:avoid}.vpr-report-heading .vpr-brand-logo{width:38mm}}
+
+#stageProgress, #stageIntro{font-size:13px;line-height:1.4;color:#687481}
+
+.vpr-tabs{margin-bottom:4px}
+#stageProgress{margin:0 0 16px}

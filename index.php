@@ -56,14 +56,10 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 
   <div class="card">
     <div class="vpr-tabs" role="tablist" aria-label="Vehicle check steps"><button type="button" id="vehicleTab" role="tab" aria-selected="true" aria-controls="vehicleStage">1. Vehicle</button><button type="button" id="paymentTab" role="tab" aria-selected="false" aria-controls="paymentStage" tabindex="-1">2. Payment</button></div>
-    <div class="hint">
     <p id="stageProgress" aria-live="polite">Step 1 of 2 — Vehicle</p>
-    </div>
     <h2 id="stageTitle" style="color:#062c52;margin:0">Vehicle details</h2>
-    <div class="hint">
     <p id="stageIntro">Enter the vehicle details below. Registration number is the unique VPR reference and is required for every search.</p>
-<div class="hint">
-    <form method="post" action="search_process.php" autocomplete="off" id="vprSearchForm" data-usd-mode="<?=htmlspecialchars(vpr_paynow_profile('USD',false)['environment'])?>" data-zwg-mode="<?=htmlspecialchars(vpr_paynow_profile('ZWG',false)['environment'])?>" data-usd-price="<?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>" data-zwg-price="<?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>">
+<form method="post" action="search_process.php" autocomplete="off" id="vprSearchForm" data-usd-mode="<?=htmlspecialchars(vpr_paynow_profile('USD',false)['environment'])?>" data-zwg-mode="<?=htmlspecialchars(vpr_paynow_profile('ZWG',false)['environment'])?>" data-usd-price="<?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>" data-zwg-price="<?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>">
 <input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>">
 <input type="hidden" name="checkout_key" value="<?=bin2hex(random_bytes(16))?>">
 <fieldset id="vehicleStage" role="tabpanel" aria-labelledby="vehicleTab" style="border:0;padding:0;margin:0"><div class="vpr-form-grid">
