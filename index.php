@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/db.php';
 security_headers();
+secure_session_start();
+header('Cache-Control: no-store');
 $pdo=db();
 $usdPrice=vpr_price($pdo,'USD');
 $zigPrice=vpr_price($pdo,'ZIG');
@@ -49,13 +51,15 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
   <div class="brand">
     <img class="logoimg" src="assets/vpr-logo.png" alt="VPR — Vehicle Pledge Registry">
     <div class="sub">Public vehicle interest verification</div>
-    <div style="display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;background:#e9f5ef;color:#1f6b47;font-size:11px;font-weight:700">🔒 HTTPS Secure Connection</div>
+    <div style="display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;background:#e9f5ef;color:#1f6b47;font-size:11px;font-weight:700"><?=request_is_https() ? '🔒 HTTPS Secure Connection' : 'Local development connection'?></div>
   </div>
 
   <div class="card">
     <h1>Check a Vehicle</h1>
     <p>Enter the vehicle details below. Registration number is the unique VPR reference and is required for every search.</p>
-<form method="post" action="#" autocomplete="off" id="vprSearchForm">
+<form method="post" action="search_process.php" autocomplete="off" id="vprSearchForm" data-usd-price="<?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>" data-zwg-price="<?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>">
+<input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>">
+<input type="hidden" name="checkout_key" value="<?=bin2hex(random_bytes(16))?>">
       <label for="registration_number">Registration Number</label>
       <input id="registration_number" name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Enter exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="e.g. AAA1111" value="<?= htmlspecialchars($_POST['registration_number'] ?? '') ?>">
 
@@ -131,7 +135,7 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 <label for="payment_currency">Payment Currency</label>
 <select id="payment_currency" name="payment_currency" required>
 <option value="USD">USD — US$<?=number_format($usdPrice,2) ?></option>
-<option value="ZIG">ZiG — ZiG <?=number_format($zigPrice,2) ?></option>
+<option value="ZWG">ZiG (ZWG) — <?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?></option>
 </select>
 </div>
 <button type="button" id="vprPayButton">Check Vehicle</button><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
@@ -154,7 +158,7 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 </div>
 
 <script>
-const currentBrand = <?= json_encode($_POST['vehicle_brand'] ?? '') ?>;
+const currentBrand = <?= json_encode($_POST['vehicle_brand'] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
 </script>
 <div style="max-width:900px;margin:24px auto;padding:14px 18px;border-top:1px solid #dfe5ea;color:#66727e;font-size:12px;line-height:1.55"><strong>Important:</strong> VPR is an independent private vehicle-interest information platform. A VPR search reports information recorded on VPR at the time of search. It does not establish vehicle ownership, statutory registration or legal priority of a security interest. Where appropriate, users should also make enquiries with relevant statutory authorities.<br><a href="terms.php">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.php">Privacy Policy</a> &nbsp;|&nbsp; <a href="corrections.php">Correction / Dispute</a></div>
@@ -164,7 +168,7 @@ if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
     <img src="assets/vpr-logo.png" alt="VPR" style="max-width:260px;width:80%;height:auto">
     <h2 style="color:#062c52;margin-bottom:4px">Complete Vehicle Check</h2>
     <div class="payprice" id="vprPayPrice">US$0.00</div>
-    <p style="margin-top:0" id="vprPayCopy">Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the USD payment.</p>
+    <p style="margin-top:0" id="vprPayCopy">Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the selected payment.</p>
     <div id="vprSpinner" class="spinner" style="display:none"></div>
     <div id="vprPayStatus" class="paystatus">Click the payment button to continue securely to Paynow.</div>
     <button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>
@@ -172,117 +176,7 @@ if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
   </div>
 </div>
 
-<script>
-(function(){
-  const form=document.getElementById('vprSearchForm');
-  const trigger=document.getElementById('vprPayButton');
-  const modal=document.getElementById('vprPayModal');
-  const openBtn=document.getElementById('vprOpenPaynow');
-  const closeBtn=document.getElementById('vprClosePay');
-  const status=document.getElementById('vprPayStatus');
-  const spinner=document.getElementById('vprSpinner');
-  const currency=document.getElementById('payment_currency');
-  const price=document.getElementById('vprPayPrice');
-  const payText=document.getElementById('vprOpenPaynowText');
-  const payCopy=document.getElementById('vprPayCopy');
-  const usdPrice=<?=json_encode(number_format($usdPrice,2,'.',''))?>;
-  const zigPrice=<?=json_encode(number_format($zigPrice,2,'.',''))?>;
-  let payment=null, popup=null, pollTimer=null;
-
-  function setBusy(on){
-    spinner.style.display=on?'block':'none';
-    openBtn.disabled=on;
-    closeBtn.disabled=on;
-  }
-
-  trigger.addEventListener('click',function(){
-    if(!form.reportValidity()) return;
-    const zig=currency.value==='ZIG';
-    const amount=parseFloat(zig?zigPrice:usdPrice);
-    if(amount<=0){
-      // Zero-fee searches never invoke or mention Paynow.
-      form.action='search_process.php';
-      form.method='post';
-      form.submit();
-      return;
-    }
-    modal.style.display='flex';
-    const formatted=amount.toFixed(2);
-    price.textContent=zig?'ZiG '+formatted:'US$'+formatted;
-    payText.textContent=zig?'Pay ZiG '+formatted+' with Paynow':'Pay US$'+formatted+' with Paynow';
-    payCopy.textContent='Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the USD payment.';
-    status.textContent='Click the payment button to continue securely to Paynow.';
-  });
-
-  closeBtn.addEventListener('click',function(){
-    modal.style.display='none';
-    if(pollTimer) clearInterval(pollTimer);
-  });
-
-  async function pollPayment(){
-    if(!payment) return;
-    try{
-      const r=await fetch('paynow_status.php?ref='+encodeURIComponent(payment.reference)+'&token='+encodeURIComponent(payment.token),{cache:'no-store'});
-      const data=await r.json();
-      if(!data.ok){
-        if(data.message) status.textContent=data.message;
-        return;
-      }
-      status.textContent='Payment status: '+data.status;
-      if(data.paid && data.certificate_url){
-        if(pollTimer) clearInterval(pollTimer);
-        if(popup && !popup.closed) popup.close();
-        status.innerHTML='<strong>Payment successful and verified.</strong><br>Generating your VPR Search Report Certificate...';
-        window.location.href=data.certificate_url;
-      }
-    }catch(e){
-      status.textContent='Checking payment status...';
-    }
-  }
-
-  openBtn.addEventListener('click',async function(){
-    if(!form.reportValidity()) return;
-    if(currency.value==='ZIG'){
-      const zigUrl=<?=json_encode(VPR_ZIG_PAYNOW_LINK)?>;
-      popup=window.open(zigUrl,'VPRPaynowZiG','popup=yes,width=650,height=780,resizable=yes,scrollbars=yes');
-      if(!popup){ status.textContent='Your browser blocked the Paynow popup. Please allow popups for VPR.'; return; }
-      status.innerHTML='<strong>ZiG payment window opened.</strong><br>Complete the ZiG payment in Paynow.';
-      const watcher=setInterval(function(){
-        if(popup.closed){
-          clearInterval(watcher);
-          status.innerHTML='<strong>Paynow window closed.</strong><br>VPR is waiting for a verifiable payment confirmation. The search cannot safely be released from popup closure alone.';
-        }
-      },700);
-      return;
-    }
-
-    setBusy(true);
-    status.textContent='Preparing your secure Paynow payment...';
-    try{
-      const fd=new FormData(form); fd.set('payment_currency','USD');
-      const r=await fetch('paynow_create.php',{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'});
-      const raw=await r.text();
-      if(!raw || !raw.trim()) throw new Error('VPR payment service returned an empty response.');
-      let data; try{data=JSON.parse(raw)}catch(e){console.error(raw);throw new Error('VPR received an invalid payment response from the server.')}
-      if(!r.ok || !data.ok) throw new Error(data.message || ('Payment service error '+r.status+'.'));
-      payment=data;
-      popup=window.open(data.browserurl,'VPRPaynow','popup=yes,width=650,height=780,resizable=yes,scrollbars=yes');
-      if(!popup) throw new Error('Your browser blocked the Paynow popup. Please allow popups for VPR.');
-      status.innerHTML='<strong>Paynow payment opened.</strong><br>Complete payment. Once Paynow confirms SUCCESS, VPR will automatically generate and open your report certificate.';
-      if(pollTimer) clearInterval(pollTimer);
-      pollTimer=setInterval(pollPayment,2000); setBusy(false); pollPayment();
-    }catch(e){
-      status.innerHTML='<strong>Payment could not be started.</strong><br>'+e.message;
-      setBusy(false);
-    }
-  });
-
-  window.addEventListener('message',function(ev){
-    if(ev.origin!==window.location.origin) return;
-    if(ev.data && ev.data.type==='VPR_PAYNOW_RETURN') pollPayment();
-  });
-})();
-</script>
+<script src="assets/checkout.js" defer></script>
 
 
 </body>

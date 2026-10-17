@@ -1,56 +1,32 @@
 <?php
-require_once __DIR__ . '/db.php';
-security_headers();
-header('Content-Type: application/json; charset=UTF-8');
-
-$ref=clean($_GET['ref']??'');
-$token=clean($_GET['token']??'');
-if(!$ref || !$token){ echo json_encode(['ok'=>false,'message'=>'Missing payment reference.']); exit; }
-
-$pdo=db();
-$stmt=$pdo->prepare("SELECT * FROM payments WHERE merchant_reference=? LIMIT 1");
-$stmt->execute([$ref]);
-$payment=$stmt->fetch(PDO::FETCH_ASSOC);
-if(!$payment || !hash_equals((string)$payment['return_token'],$token)){
-    echo json_encode(['ok'=>false,'message'=>'Payment reference not found.']); exit;
-}
-
-try{
-    if(!empty($payment['pollurl']) && !paynow_is_paid($payment['status'])){
-        $confirmed=paynow_poll_status($payment['pollurl']);
-        $confirmedRef=clean(paynow_get($confirmed,'reference',''));
-        if($confirmedRef && hash_equals($ref,$confirmedRef)){
-            $status=(string)paynow_get($confirmed,'status',$payment['status']);
-            $amount=(string)paynow_get($confirmed,'amount',$payment['amount']);
-            $payref=(string)paynow_get($confirmed,'paynowreference',$payment['paynow_reference']);
-            if(!payment_amount_ok($amount)) $status='AmountMismatch';
-            $paidAt=paynow_is_paid($status)?date('Y-m-d H:i:s'):null;
-
-            $pdo->prepare("UPDATE payments SET paynow_reference=?,amount=?,status=?,paid_at=COALESCE(paid_at,?),last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE merchant_reference=?")
-                ->execute([$payref,$amount,$status,$paidAt,$ref]);
-
-            if(paynow_is_paid($status)) finalize_vpr_search_from_payment($ref);
-        }
+require_once __DIR__ . '/db.php'; security_headers();
+header('Content-Type: application/json; charset=UTF-8'); header('Cache-Control: no-store');
+try {
+    $ref = $_GET['ref'] ?? ''; $token = $_GET['token'] ?? '';
+    if (!is_string($ref) || !is_string($token) || $ref === '' || $token === '') {
+        http_response_code(400); echo json_encode(['ok'=>false,'message'=>'Missing payment access details.']); exit;
     }
-}catch(Throwable $e){
-    $pdo->prepare("UPDATE payments SET last_error=?,updated_at=CURRENT_TIMESTAMP WHERE merchant_reference=?")
-        ->execute([mb_substr($e->getMessage(),0,1000),$ref]);
+    $pdo = db(); $payment = vpr_payment($pdo, $ref);
+    if (!$payment || !hash_equals((string)$payment['return_token'], $token)) {
+        http_response_code(403); echo json_encode(['ok'=>false,'message'=>'Payment access denied.']); exit;
+    }
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Explicit customer reconciliation, using the same reference rather than a new charge.
+        try { vpr_poll_payment($pdo, $ref, true); } catch (Throwable $ignored) {}
+        $payment = vpr_payment($pdo, $ref);
+    }
+    // Browser reads persisted state. Callbacks and CLI reconciliation verify with Paynow.
+    $paid = $payment['status'] === 'Paid' && !empty($payment['verified_at']) && !empty($payment['search_id']);
+    $url = null;
+    if ($paid) {
+        $q = $pdo->prepare('SELECT access_token FROM searches WHERE id=?'); $q->execute([$payment['search_id']]);
+        $access = $q->fetchColumn();
+        if ($access) $url = 'certificate.php?id='.(int)$payment['search_id'].'&token='.urlencode($access);
+    }
+    echo json_encode(['ok'=>true,'paid'=>$paid && $url !== null,'status'=>$payment['status'],
+        'currency'=>$payment['currency'],'amount'=>$payment['expected_amount'],'certificate_url'=>$url,
+        'needs_review'=>!empty($payment['last_error']) || !empty($payment['reconciliation_note']),
+        'message'=>!empty($payment['last_error']) ? 'Verification is pending. Keep this reference; contact VPR if the delay continues.' : null]);
+} catch (Throwable $e) {
+    http_response_code(503); echo json_encode(['ok'=>false,'message'=>'Payment status is temporarily unavailable. Check again.']);
 }
-
-$stmt=$pdo->prepare("SELECT p.*,s.access_token FROM payments p LEFT JOIN searches s ON s.id=p.search_id WHERE p.merchant_reference=? LIMIT 1");
-$stmt->execute([$ref]);
-$payment=$stmt->fetch(PDO::FETCH_ASSOC);
-
-$paid=paynow_is_paid($payment['status']) && !empty($payment['search_id']);
-$url=null;
-if($paid){
-    $url='certificate.php?id='.(int)$payment['search_id'].'&token='.urlencode((string)$payment['access_token']);
-}
-echo json_encode([
-    'ok'=>true,
-    'status'=>$payment['status'],
-    'paid'=>$paid,
-    'certificate_url'=>$url,
-    'message'=>$payment['last_error']?:null
-]);
-?>

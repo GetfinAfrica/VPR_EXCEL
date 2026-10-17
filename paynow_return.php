@@ -1,27 +1,44 @@
 <?php
-require_once __DIR__ . '/db.php';
-security_headers();
-$ref=clean($_GET['ref']??'');
-$token=clean($_GET['token']??'');
-?><!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VPR Payment</title>
-<style>body{font-family:Arial;background:#f5f7f9;padding:30px;color:#17212b}.box{max-width:520px;margin:auto;background:#fff;border:1px solid #dfe5ea;border-radius:14px;padding:26px;text-align:center}.spin{width:34px;height:34px;border:4px solid #e4e9ee;border-top-color:#062c52;border-radius:50%;margin:18px auto;animation:s .9s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style>
-</head><body><div class="box"><img src="assets/vpr-logo.png" alt="VPR" style="max-width:280px;width:80%"><h2>Returning to VPR</h2><div class="spin"></div><p id="msg">Confirming your Paynow payment...</p></div>
+require_once __DIR__ . '/db.php'; security_headers(); header('Cache-Control: no-store');
+$ref = is_string($_GET['ref'] ?? null) ? $_GET['ref'] : '';
+$token = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
+?>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VPR Payment Status</title>
+<style>body{font:16px Arial;background:#f5f7f9;padding:30px;color:#17212b}.box{max-width:560px;margin:auto;background:white;border:1px solid #dfe5ea;border-radius:14px;padding:26px;text-align:center}button{padding:12px 20px;cursor:pointer}p{overflow-wrap:anywhere}</style>
+</head><body><div class="box"><img src="assets/vpr-logo.png" alt="VPR" style="max-width:280px;width:80%">
+<h2>Payment status</h2><p>Reference: <strong><?=htmlspecialchars($ref)?></strong></p>
+<p id="amount"></p><p id="msg">Waiting for verified payment confirmation.</p>
+<button id="check" type="button">Check status again</button><p><a id="new-search" href="index.php">New vehicle search</a></p></div>
 <script>
-(async function(){
- const ref=<?=json_encode($ref)?>, token=<?=json_encode($token)?>;
- try{
-   const r=await fetch('paynow_status.php?ref='+encodeURIComponent(ref)+'&token='+encodeURIComponent(token),{cache:'no-store'});
-   const d=await r.json();
-   if(window.opener){ window.opener.postMessage({type:'VPR_PAYNOW_RETURN'},window.location.origin); }
-   if(d.paid && d.certificate_url){
-      if(window.opener && !window.opener.closed){ window.opener.location.href=d.certificate_url; window.close(); return; }
-      window.location.href=d.certificate_url; return;
-   }
-   document.getElementById('msg').textContent='Payment received by Paynow. VPR is waiting for final confirmation; you may close this window.';
-   setTimeout(function(){ if(window.opener) window.close(); },1800);
- }catch(e){
-   document.getElementById('msg').textContent='VPR is checking your payment. You may return to the main VPR window.';
+(function(){
+ const ref=<?=json_encode($ref, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)?>;
+ const token=<?=json_encode($token, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)?>;
+ const msg=document.getElementById('msg'),button=document.getElementById('check');
+ let timer=null,attempts=0,busy=false;
+ function forget(){try{sessionStorage.removeItem('vpr.pendingCheckout');sessionStorage.removeItem('vpr.checkoutRequest');}catch(e){}}
+ document.getElementById('new-search').addEventListener('click',forget);
+ async function check(manual=false){
+   if(busy)return; busy=true;button.disabled=true;
+   try{
+     const r=await fetch('paynow_status.php?ref='+encodeURIComponent(ref)+'&token='+encodeURIComponent(token),{cache:'no-store',method:manual?'POST':'GET'});
+     const d=await r.json();
+     if(!r.ok||!d.ok){msg.textContent=d.message||'Unable to check status.';return;}
+     document.getElementById('amount').textContent=(d.currency==='ZWG'?'ZiG (ZWG)':d.currency)+' '+(d.amount||'');
+     if(d.paid&&d.certificate_url){
+       forget();
+       clearTimeout(timer);
+       if(window.opener&&!window.opener.closed)window.opener.postMessage({type:'VPR_PAYNOW_RETURN'},window.location.origin);
+       window.location.replace(d.certificate_url);return;
+     }
+     const terminal=['Cancelled','Failed','Expired'].includes(d.status);
+     if(terminal)forget();
+     msg.textContent=terminal?'Payment '+d.status.toLowerCase()+'. No certificate has been issued.':
+       (d.message||'Payment status: '+d.status+'. Waiting for server verification; keep this reference.');
+     if(!terminal&&++attempts<60){clearTimeout(timer);timer=setTimeout(check,10000);}
+   }catch(e){msg.textContent='Status temporarily unavailable. Check again using this same reference.';}
+   finally{busy=false;button.disabled=false;}
  }
+ button.addEventListener('click',function(){attempts=0;check(true);});check();
 })();
 </script></body></html>

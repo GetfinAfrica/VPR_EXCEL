@@ -1,5 +1,8 @@
 <?php
-require_once __DIR__ . '/config.php';
+$vprRuntimeConfig = in_array(PHP_SAPI, ['cli','cli-server'], true) ? getenv('VPR_CONFIG_FILE') : false;
+require_once ($vprRuntimeConfig ?: __DIR__ . '/config.php');
+unset($vprRuntimeConfig);
+require_once __DIR__ . '/payments.php';
 
 
 function vpr_setting(PDO $pdo, string $key, string $default=''): string {
@@ -16,9 +19,7 @@ function vpr_set_setting(PDO $pdo, string $key, string $value): void {
     $q->execute([$key,$value]);
 }
 function vpr_price(PDO $pdo, string $currency): float {
-    $currency=strtoupper($currency);
-    $fallback=$currency==='ZIG' ? (defined('VPR_ZIG_SEARCH_FEE')?VPR_ZIG_SEARCH_FEE:'2.00') : (defined('VPR_SEARCH_FEE')?VPR_SEARCH_FEE:'1.00');
-    return max(0,(float)vpr_setting($pdo,'price_'.$currency,(string)$fallback));
+    return (float)vpr_price_amount($pdo, $currency);
 }
 
 function db() {
@@ -35,7 +36,16 @@ function db() {
         $pdo->exec('PRAGMA foreign_keys = ON');
         $pdo->exec('PRAGMA temp_store = MEMORY');
 
-        ensure_v6_schema($pdo);
+        // Serialize first-request migrations so concurrent callbacks cannot race ALTER TABLE.
+        $pdo->exec('BEGIN IMMEDIATE');
+        try {
+            ensure_v6_schema($pdo);
+            $pdo->exec('COMMIT');
+        } catch (Throwable $e) {
+            $pdo->exec('ROLLBACK');
+            $pdo = null;
+            throw $e;
+        }
     }
     return $pdo;
 }
@@ -242,205 +252,6 @@ function set_admin_password($password) {
 
 
 
-function paynow_create_hash(array $values) {
-    $string = '';
-    foreach ($values as $key => $value) {
-        if (strtoupper((string)$key) !== 'HASH') {
-            $string .= (string)$value;
-        }
-    }
-    $string .= VPR_PAYNOW_INTEGRATION_KEY;
-    return strtoupper(hash('sha512', $string));
-}
-
-function paynow_validate_hash(array $values) {
-    $received = null;
-    foreach ($values as $key => $value) {
-        if (strtoupper((string)$key) === 'HASH') {
-            $received = strtoupper((string)$value);
-            break;
-        }
-    }
-    if (!$received) return false;
-    return hash_equals(paynow_create_hash($values), $received);
-}
-
-function paynow_get(array $values, $wanted, $default = null) {
-    foreach ($values as $key => $value) {
-        if (strtolower((string)$key) === strtolower((string)$wanted)) return $value;
-    }
-    return $default;
-}
-
-function paynow_parse_response($response) {
-    $data = [];
-    parse_str((string)$response, $data);
-    return $data;
-}
-
-function paynow_http_post($url, array $fields = []) {
-    $body = http_build_query($fields, '', '&', PHP_QUERY_RFC1738);
-
-    if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $body,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => false,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/x-www-form-urlencoded',
-                'Accept: text/plain',
-                'User-Agent: VPR-Paynow/12.7'
-            ],
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2
-        ]);
-        $response = curl_exec($ch);
-        $errno = curl_errno($ch);
-        $error = curl_error($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($response === false || $errno) {
-            throw new Exception('Unable to connect to Paynow: '.$error);
-        }
-        if ($code < 200 || $code >= 300) {
-            throw new Exception('Paynow returned HTTP '.$code.'.');
-        }
-        return $response;
-    }
-
-    $allow = strtolower((string)ini_get('allow_url_fopen'));
-    if (!in_array($allow, ['1','on','yes','true'], true)) {
-        throw new Exception('The server cannot make outbound Paynow requests. Enable PHP cURL or allow_url_fopen.');
-    }
-
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/x-www-form-urlencoded\r\nAccept: text/plain\r\nUser-Agent: VPR-Paynow/12.7\r\n",
-            'content' => $body,
-            'timeout' => 30,
-            'ignore_errors' => true
-        ],
-        'ssl' => [
-            'verify_peer' => true,
-            'verify_peer_name' => true
-        ]
-    ]);
-    $response = @file_get_contents($url, false, $context);
-    if ($response === false) throw new Exception('Unable to connect to Paynow from this hosting server.');
-    return $response;
-}
-
-function paynow_poll_status($pollurl) {
-    if (!$pollurl) throw new Exception('Missing Paynow poll URL.');
-    $response = paynow_http_post($pollurl, []);
-    $data = paynow_parse_response($response);
-    if (!paynow_validate_hash($data)) {
-        throw new Exception('Paynow status signature could not be verified.');
-    }
-    return $data;
-}
-
-function paynow_is_paid($status) {
-    return in_array(strtolower(trim((string)$status)), ['paid','awaiting delivery','delivered'], true);
-}
-
-function payment_amount_ok($amount) {
-    return number_format((float)$amount, 2, '.', '') === number_format((float)VPR_SEARCH_FEE, 2, '.', '');
-}
-
-function finalize_vpr_search_from_payment($merchantReference) {
-    $pdo = db();
-    $stmt = $pdo->prepare("SELECT * FROM payments WHERE merchant_reference=? LIMIT 1");
-    $stmt->execute([$merchantReference]);
-    $payment = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$payment || !paynow_is_paid($payment['status']) || !payment_amount_ok($payment['amount'])) return null;
-    if (!empty($payment['search_id'])) return (int)$payment['search_id'];
-
-    $reg = normalise_reg($payment['registration_number']);
-    $brand = clean($payment['vehicle_brand']);
-    $model = clean($payment['vehicle_model']);
-    $chassis = normalise_chassis($payment['chassis_number']);
-
-    $pdo->beginTransaction();
-    try {
-        // Re-check after transaction starts to avoid duplicate search generation.
-        $lock = $pdo->prepare("SELECT search_id FROM payments WHERE merchant_reference=?");
-        $lock->execute([$merchantReference]);
-        $existingSearch = $lock->fetchColumn();
-        if ($existingSearch) {
-            $pdo->commit();
-            return (int)$existingSearch;
-        }
-
-        $vehicle = find_vehicle_by_reg($pdo, $reg);
-        if (!$vehicle) {
-            $st = $pdo->prepare("INSERT INTO vehicles(chassis_number,vehicle_brand,vehicle_model,registration_number) VALUES(?,?,?,?)");
-            $st->execute([$chassis,$brand,$model,$reg]);
-            $vehicleId = (int)$pdo->lastInsertId();
-            $st = $pdo->prepare("SELECT * FROM vehicles WHERE id=?");
-            $st->execute([$vehicleId]);
-            $vehicle = $st->fetch(PDO::FETCH_ASSOC);
-        } else {
-            $bestModel = mb_strlen($model) > mb_strlen((string)$vehicle['vehicle_model']) ? $model : $vehicle['vehicle_model'];
-            $bestBrand = ($vehicle['vehicle_brand']==='' || $vehicle['vehicle_brand']==='Other') ? $brand : $vehicle['vehicle_brand'];
-            $bestChassis = $vehicle['chassis_number'] ?: $chassis;
-            $pdo->prepare("UPDATE vehicles SET chassis_number=?,vehicle_brand=?,vehicle_model=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-                ->execute([$bestChassis,$bestBrand,$bestModel,$vehicle['id']]);
-        }
-
-        $st=$pdo->prepare("
-            SELECT i.*,
-              (SELECT COUNT(*) FROM interests i2
-               WHERE i2.vehicle_id=i.vehicle_id
-                 AND (datetime(i2.created_at)<datetime(i.created_at)
-                      OR (i2.created_at=i.created_at AND i2.id<=i.id))) AS registration_order
-            FROM interests i
-            WHERE i.vehicle_id=? AND i.status='ACTIVE'
-            ORDER BY datetime(i.created_at),i.id
-        ");
-        $st->execute([$vehicle['id']]);
-        $interests=$st->fetchAll(PDO::FETCH_ASSOC);
-
-        $resultCode = count($interests) ? 'INTEREST RECORDED ON VPR' : 'NO INTEREST RECORDED ON VPR';
-
-        $st=$pdo->prepare("INSERT INTO searches(vehicle_id,chassis_number,vehicle_brand,vehicle_model,registration_number,result,ip_address) VALUES(?,?,?,?,?,?,?)");
-        $st->execute([$vehicle['id'],$chassis,$brand,$model,$reg,$resultCode,protected_ip_value()]);
-        $searchId=(int)$pdo->lastInsertId();
-
-        $cert=certificate_ref($searchId,date('Y-m-d H:i:s'));
-        $accessToken=generate_cert_token();
-        $pdo->prepare("UPDATE searches SET certificate_number=?,access_token=? WHERE id=?")->execute([$cert,$accessToken,$searchId]);
-
-        if ($interests) {
-            $snap=$pdo->prepare("INSERT INTO search_interests(search_id,priority_rank,interested_party,reference_note,interest_registered_at) VALUES(?,?,?,?,?)");
-            foreach($interests as $interest) {
-                $snap->execute([
-                    $searchId,
-                    (int)$interest['registration_order'],
-                    $interest['interested_party'],
-                    $interest['reference_note']??null,
-                    $interest['created_at']??null
-                ]);
-            }
-        }
-
-        $pdo->prepare("UPDATE payments SET search_id=?,updated_at=CURRENT_TIMESTAMP WHERE merchant_reference=?")
-            ->execute([$searchId,$merchantReference]);
-
-        $pdo->commit();
-        return $searchId;
-    } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        throw $e;
-    }
-}
-
 function clean($value) {
     return trim((string)$value);
 }
@@ -599,6 +410,8 @@ $pdo->prepare("INSERT OR REPLACE INTO system_metadata(meta_key,meta_value) VALUE
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_payments_reg ON payments(registration_number)");
 
+
+    vpr_checkout_schema($pdo);
 
     // Freeze a certificate number onto legacy searches so future exports/imports keep it stable.
     $legacy = $pdo->query("SELECT id,searched_at FROM searches WHERE certificate_number IS NULL OR certificate_number=''")->fetchAll(PDO::FETCH_ASSOC);
