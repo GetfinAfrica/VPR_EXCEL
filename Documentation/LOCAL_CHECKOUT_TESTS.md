@@ -1,5 +1,7 @@
 # Local Apache and checkout scenarios
 
+Current interface: see [UI_ENHANCEMENTS.md](UI_ENHANCEMENTS.md) for the `ui/enhancements` flow. Active payments now check every two seconds and remain on the confirmation screen until the user selects Complete, then View certificate from the VPR acknowledgement. The verification notes below include historical tests of the earlier automatic-certificate flow.
+
 The form has two stages: vehicle details, then currency/payer/method details. Back preserves vehicle input. Paid fields are not required during the vehicle stage or for a server-authorized free search. A review modal belongs to the payment stage. The checkout asset is versioned to avoid stale cached JavaScript after updating either local installation.
 
 In test mode, EcoCash/OneMoney offer an optional scenario selector. It fills the mobile field explicitly; users may also enter a number manually. No number is hard-coded into outgoing requests. Local/international forms are normalized, then sent to Paynow in the documented local format.

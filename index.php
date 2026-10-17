@@ -46,26 +46,28 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 @keyframes vprspin{to{transform:rotate(360deg)}} .payclose{background:#e8edf2;color:var(--ink);margin-top:12px}
 
 </style>
-</head>
+<?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head>
 <body>
 <div class="wrap">
+  <?php vpr_page_heading('Vehicle check','Vehicle Pledge Registry'); ?>
   <div class="brand">
-    <img class="logoimg" src="assets/vpr-logo.png" alt="VPR — Vehicle Pledge Registry">
-    <div class="sub">Public vehicle interest verification</div>
     <div style="display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;background:#e9f5ef;color:#1f6b47;font-size:11px;font-weight:700"><?=request_is_https() ? '🔒 HTTPS Secure Connection' : 'Local development connection'?></div>
   </div>
 
   <div class="card">
-    <h1 id="stageTitle">Vehicle details</h1><p id="stageProgress" aria-live="polite">Step 1 of 2 — Vehicle</p>
-    <p>Enter the vehicle details below. Registration number is the unique VPR reference and is required for every search.</p>
+    <div class="vpr-tabs" role="tablist" aria-label="Vehicle check steps"><button type="button" id="vehicleTab" role="tab" aria-selected="true" aria-controls="vehicleStage">1. Vehicle</button><button type="button" id="paymentTab" role="tab" aria-selected="false" aria-controls="paymentStage" tabindex="-1">2. Payment</button></div>
+    <p id="stageProgress" aria-live="polite">Step 1 of 2 — Vehicle</p>
+    <h2 id="stageTitle" style="color:#062c52;margin:0">Vehicle details</h2>
+    <p id="stageIntro">Enter the vehicle details below. Registration number is the unique VPR reference and is required for every search.</p>
 <form method="post" action="search_process.php" autocomplete="off" id="vprSearchForm" data-usd-mode="<?=htmlspecialchars(vpr_paynow_profile('USD',false)['environment'])?>" data-zwg-mode="<?=htmlspecialchars(vpr_paynow_profile('ZWG',false)['environment'])?>" data-usd-price="<?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>" data-zwg-price="<?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>">
 <input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>">
 <input type="hidden" name="checkout_key" value="<?=bin2hex(random_bytes(16))?>">
-<fieldset id="vehicleStage" style="border:0;padding:0;margin:0">
-      <label for="registration_number">Registration Number</label>
-      <input id="registration_number" name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Enter exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="e.g. AAA1111" value="<?= htmlspecialchars($_POST['registration_number'] ?? '') ?>">
-
-      <label for="vehicle_brand">Vehicle Brand</label>
+<fieldset id="vehicleStage" role="tabpanel" aria-labelledby="vehicleTab" style="border:0;padding:0;margin:0"><div class="vpr-form-grid">
+<div class="vpr-col-6"><label for="registration_number">Registration Number</label>
+      <input id="registration_number" name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Enter exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="e.g. AAA1111" value="<?= htmlspecialchars($_POST['registration_number'] ?? '') ?>"></div>
+<div class="vpr-col-6"><label for="chassis_number">Chassis Number <span class="optional">(optional)</span></label>
+      <input id="chassis_number" name="chassis_number" placeholder="Enter if available" value="<?= htmlspecialchars($_POST['chassis_number'] ?? '') ?>"></div>
+<div class="vpr-col-6"><label for="vehicle_brand">Vehicle Brand</label>
       <select id="vehicle_brand" name="vehicle_brand" required>
         <option value="">Select vehicle brand</option>
         <option value="Toyota">Toyota</option>
@@ -124,18 +126,12 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
         <option value="Mahindra">Mahindra</option>
         <option value="Ashok Leyland">Ashok Leyland</option>
         <option value="Other">Other</option>
-      </select>
-
-      <label for="vehicle_model">Vehicle Model</label>
+      </select></div>
+<div class="vpr-col-6"><label for="vehicle_model">Vehicle Model</label>
       <input id="vehicle_model" name="vehicle_model" required placeholder="e.g. Fortuner, Hilux, Prado, NV350" value="<?= htmlspecialchars($_POST['vehicle_model'] ?? '') ?>">
-      <div class="hint">Enter the model as fully as possible, e.g. “NV350” rather than “NV”.</div>
-
-      <label for="chassis_number">Chassis Number <span class="optional">(optional)</span></label>
-      <input id="chassis_number" name="chassis_number" placeholder="Enter if available" value="<?= htmlspecialchars($_POST['chassis_number'] ?? '') ?>">
-
-<button type="button" id="vprContinue">Continue to payment</button>
-</fieldset>
-<fieldset id="paymentStage" style="border:0;padding:0;margin:0" hidden disabled>
+      <div class="hint">Enter the model as fully as possible, e.g. “NV350” rather than “NV”.</div></div>
+</div><div class="vpr-actions"><button type="button" id="vprContinue">Continue to payment</button></div></fieldset>
+<fieldset role="tabpanel" aria-labelledby="paymentTab" id="paymentStage" style="border:0;padding:0;margin:0" hidden disabled>
       <div class="field" style="margin-top:14px">
 <fieldset class="currency-picker">
 <legend>Payment currency</legend>
@@ -147,24 +143,23 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 <p id="currencySummary" class="currency-summary" role="status" aria-live="polite">You will pay USD <?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>.</p>
 </fieldset>
 </div>
-<fieldset id="checkoutDetails" style="border:0;padding:0;margin:12px 0">
-<legend style="font-weight:bold">Payment details</legend>
-<label for="payer_name">Full name</label><input id="payer_name" name="payer_name" maxlength="100" autocomplete="name" required>
-<label for="payer_email">Email address</label><input type="email" id="payer_email" name="payer_email" maxlength="254" autocomplete="email" required>
-<label for="payment_method">Payment method</label>
+<fieldset id="checkoutDetails" style="border:0;padding:0;margin:12px 0"><legend style="font-weight:bold">Payer details</legend><div class="vpr-form-grid">
+<div class="vpr-col-6"><label for="payer_name">Full name</label><input id="payer_name" name="payer_name" maxlength="100" autocomplete="name" required></div>
+<div class="vpr-col-6"><label for="payer_email">Email address</label><input type="email" id="payer_email" name="payer_email" maxlength="254" autocomplete="email" required></div>
+<div class="vpr-col-6"><label for="payment_method">Payment method</label>
 <select id="payment_method" name="payment_method">
 <option value="hosted">Choose on Paynow</option><option value="card">Visa / Mastercard — secure Paynow checkout</option>
-<option value="ecocash">EcoCash</option><option value="onemoney">OneMoney</option><option value="innbucks">InnBucks</option></select>
-<div id="testScenarioBox" hidden>
+<option value="ecocash">EcoCash</option><option value="onemoney">OneMoney</option><option value="innbucks">InnBucks</option></select></div>
+<div class="vpr-col-6"><label for="payer_phone">Mobile number <span id="phoneHint" class="optional">(optional)</span></label>
+<input type="tel" id="payer_phone" name="payer_phone" maxlength="20" autocomplete="tel" placeholder="Enter mobile number"></div>
+<div class="vpr-col-6" id="testScenarioBox" hidden>
 <label for="test_scenario">Paynow test scenario</label>
 <select id="test_scenario" name="test_scenario"><option value="manual">Enter a number manually</option><option value="0771111111">Success — 0771111111</option><option value="0772222222">Delayed success — 0772222222</option><option value="0773333333">Customer cancels — 0773333333</option><option value="0774444444">Insufficient funds — 0774444444</option></select>
 <p class="hint">Test mode: use the integration owner's email. The selected scenario fills the mobile number below; no real money moves.</p></div>
-<label for="payer_phone">Mobile number <span id="phoneHint" class="optional">(optional)</span></label>
-<input type="tel" id="payer_phone" name="payer_phone" maxlength="20" autocomplete="tel" placeholder="Enter mobile number">
-<p class="hint" id="methodHint">Enter card details only on Paynow. Never enter a PIN or card number here.</p>
-</fieldset>
-<button type="button" id="vprBack" class="payclose">Back to vehicle</button>
-<button type="button" id="vprPayButton">Review payment</button><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
+<p class="hint vpr-col-12" id="methodHint">Enter card details only on Paynow. Never enter a PIN or card number here.</p>
+</div></fieldset>
+<div class="vpr-actions"><button type="button" id="vprBack" class="payclose">Back to vehicle</button>
+<button type="button" id="vprPayButton">Review payment</button></div><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
     </fieldset>
     </form>
 
@@ -191,17 +186,17 @@ if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
 <div style="max-width:900px;margin:24px auto;padding:14px 18px;border-top:1px solid #dfe5ea;color:#66727e;font-size:12px;line-height:1.55"><strong>Important:</strong> VPR is an independent private vehicle-interest information platform. A VPR search reports information recorded on VPR at the time of search. It does not establish vehicle ownership, statutory registration or legal priority of a security interest. Where appropriate, users should also make enquiries with relevant statutory authorities.<br><a href="terms.php">Terms of Use</a> &nbsp;|&nbsp; <a href="privacy.php">Privacy Policy</a> &nbsp;|&nbsp; <a href="corrections.php">Correction / Dispute</a></div>
 
 <div class="paymodal" id="vprPayModal">
-  <div class="paycard">
-    <img src="assets/vpr-logo.png" alt="VPR" style="max-width:260px;width:80%;height:auto">
-    <h2 style="color:#062c52;margin-bottom:4px">Complete Vehicle Check</h2>
+  <div class="paycard" role="dialog" aria-modal="true" aria-labelledby="vprPayTitle">
+    <?php vpr_page_heading('Complete vehicle check','Secure payment',2,'vprPayTitle'); ?>
     <div class="payprice" id="vprPayPrice">US$0.00</div>
     <p style="margin-top:0" id="vprPayCopy">Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the selected payment.</p>
+    <div id="vprPayOutcome" class="vpr-success" hidden role="status">✓ Payment confirmed by Paynow</div>
     <div id="vprSpinner" class="spinner" style="display:none" aria-hidden="true"></div>
-    <div id="vprProgress" hidden role="status" aria-live="polite"><strong id="vprProgressTitle">Waiting for payment approval</strong><p class="hint">Keep this page open. We check Paynow automatically and open your certificate once payment is verified.</p></div>
+    <div id="vprProgress" hidden role="status" aria-live="polite"><strong id="vprProgressTitle">Waiting for payment approval</strong><p class="hint">Keep this page open. We check Paynow every two seconds. You can complete the checkout after payment is verified.</p></div>
     <div id="vprPayStatus" class="paystatus" role="status" aria-live="polite">Click the payment button to continue securely to Paynow.</div>
     <a id="innbucksOpen" hidden>Open InnBucks app</a>
-    <button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>
-    <button type="button" id="vprClosePay" class="payclose">Back to payment details</button>
+    <div class="vpr-actions"><button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>
+    <button type="button" id="vprClosePay" class="payclose">Back to payment details</button></div>
   </div>
 </div>
 

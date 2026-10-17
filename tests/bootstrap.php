@@ -5,9 +5,12 @@ $fixture = getenv('VPR_TEST_FIXTURE');
 if (!$fixture) {
     $fixture = sys_get_temp_dir() . '/vpr-checkout-' . bin2hex(random_bytes(8));
     mkdir($fixture); mkdir($fixture . '/data');
-    foreach (['db.php','payments.php','paynow_profiles.php','express_checkout.php','index.php','search_process.php','paynow_create.php','paynow_result.php','paynow_status.php','paynow_return.php','certificate.php','admin2000.php'] as $file) {
+    foreach (['db.php','payments.php','paynow_profiles.php','express_checkout.php','index.php','search_process.php','paynow_create.php','paynow_result.php','paynow_status.php','paynow_return.php','certificate.php','admin2000.php','ui.php','payment_success.php'] as $file) {
         copy(dirname(__DIR__) . '/' . $file, $fixture . '/' . $file);
     }
+    mkdir($fixture.'/assets');
+    copy(dirname(__DIR__).'/assets/ui.css',$fixture.'/assets/ui.css');
+    copy(dirname(__DIR__).'/assets/checkout.js',$fixture.'/assets/checkout.js');
     $config = <<<'PHP'
 <?php
 define('VPR_DB', __DIR__.'/data/vpr.sqlite');

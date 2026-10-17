@@ -40,6 +40,10 @@ if (!$interests && $s['result'] === 'INTEREST RECORDED ON VPR' && !empty($s['veh
 
 $ref = certificate_number_for_row($s);
 $isClear = in_array($s['result'], ['NO INTEREST RECORDED ON VPR','NO INTEREST RECORDED'], true);
+$certificateParents=[];
+$receiptQuery=$pdo->prepare("SELECT merchant_reference,return_token FROM payments WHERE search_id=? AND status='Paid' AND verified_at IS NOT NULL ORDER BY id DESC LIMIT 1");
+$receiptQuery->execute([$s['id']]);$receipt=$receiptQuery->fetch(PDO::FETCH_ASSOC);
+if($receipt)$certificateParents[]=['label'=>'Payment acknowledgement','href'=>'payment_success.php?ref='.urlencode($receipt['merchant_reference']).'&token='.urlencode($receipt['return_token'])];
 ?>
 <!doctype html>
 <html lang="en">
@@ -83,15 +87,14 @@ html,body{width:210mm;height:297mm;margin:0!important;padding:0!important;backgr
 .auth{margin-top:5mm}.footer{margin-top:4mm;font-size:9px}
 }
 </style>
-</head>
+<?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head>
 <body>
-<button class="print" onclick="window.print()">Print / Save PDF</button>
+<div class="vpr-certificate-nav"><?php vpr_breadcrumbs('Certificate',$certificateParents); ?></div>
+<div class="vpr-actions vpr-print-actions"><button class="print" onclick="window.print()">Print / Save PDF</button><a class="vpr-secondary" href="index.php">New vehicle check</a></div>
 <div class="page">
 <div class="watermark">VPR VERIFIED RECORD</div>
 <div class="content">
-<img class="logo" src="assets/vpr-logo.png" alt="VPR">
-<div class="title">VPR Vehicle Interest Search Report</div>
-<div class="subtitle">Vehicle Pledge Registry</div>
+<header class="vpr-page-heading vpr-report-heading"><div><h1 class="title">Vehicle interest search report</h1><div class="subtitle">Vehicle Pledge Registry</div></div><img class="vpr-brand-logo" src="assets/vpr-logo.png" alt="VPR"></header>
 <div class="rule"></div>
 
 <div class="refbox">
