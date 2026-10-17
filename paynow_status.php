@@ -27,8 +27,8 @@ try {
         'currency'=>$payment['currency'],'amount'=>$payment['expected_amount'],
         'payment_method'=>$payment['payment_method'],'instructions'=>$payment['payment_instructions'],'certificate_url'=>$url,
         'authorization_code'=>$payment['authorization_code'],'authorization_expires'=>$payment['authorization_expires'],
-        'needs_review'=>!empty($payment['last_error']) || !empty($payment['reconciliation_note']),
-        'message'=>!empty($payment['last_error']) ? 'Verification is pending. Keep this reference; contact VPR if the delay continues.' : null]);
+        'needs_review'=>($payment['status']!=='Failed' && !empty($payment['last_error'])) || !empty($payment['reconciliation_note']),
+        'error_code'=>$payment['last_error'],'message'=>vpr_payment_message($payment)]);
 } catch (Throwable $e) {
     http_response_code(503); echo json_encode(['ok'=>false,'message'=>'Payment status is temporarily unavailable. Check again.']);
 }

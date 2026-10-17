@@ -22,6 +22,23 @@ function vpr_is_express(string $method): bool {
     return in_array($method,['ecocash','onemoney','innbucks'],true);
 }
 
+function vpr_init_decline(array $data): array {
+    $error=strtolower((string)paynow_get($data,'error',''));
+    if (strpos($error,'insufficient')!==false || strpos($error,'balance')!==false) return ['InsufficientFunds','Insufficient funds. No certificate was issued. Check your balance or choose another payment method.'];
+    if (strpos($error,'email')!==false) return ['PayerEmailRejected','Paynow rejected the payer email. In test mode, use the integration owner’s email. No certificate was issued.'];
+    if (strpos($error,'method')!==false) return ['MethodUnavailable','This payment method is not available for this integration. No certificate was issued.'];
+    if (strpos($error,'phone')!==false || strpos($error,'msisdn')!==false) return ['PhoneRejected','Paynow rejected this mobile number. Check the number and selected payment method.'];
+    return ['PaymentRejected','Paynow rejected this payment request. Check the payment details and integration settings. No certificate was issued.'];
+}
+
+function vpr_payment_message(array $payment): ?string {
+    if ($payment['status']==='Failed') return $payment['payment_instructions'] ?: 'Payment failed. No certificate was issued.';
+    if ($payment['status']==='Cancelled') return 'Payment cancelled. No certificate was issued.';
+    if ($payment['status']==='Expired') return 'Payment expired. No certificate was issued.';
+    if (!empty($payment['last_error'])) return $payment['payment_instructions'] ?: 'Verification is temporarily unavailable. Keep this reference and check again.';
+    return null;
+}
+
 function vpr_express_instructions(array $data,string $method): string {
     if ($method==='innbucks') {
         $code=(string)paynow_get($data,'authorizationcode','');

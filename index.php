@@ -20,7 +20,7 @@ $searchId = null;
 <title>VPR — Vehicle Pledge Registry</title>
 <style>
 :root{--navy:#062c52;--navy2:#0c4d86;--gold:#b88a26;--gold2:#dfbf68;--ink:#14202b;--muted:#687481;--line:#dfe5ea;--bg:#f5f7f9;--ok:#1f6b47;--okbg:#e9f5ef;--warn:#8f2d2d;--warnbg:#fbecec}
-*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}
+[hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}
 .wrap{max-width:820px;margin:0 auto;padding:30px 20px 54px}.brand{text-align:center;margin-bottom:20px}
 .logoimg{width:min(560px,92%);height:auto;display:block;margin:0 auto 8px}.sub{font-size:14px;color:var(--muted);letter-spacing:.02em}
 .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 10px 32px rgba(6,44,82,.08)}
@@ -55,11 +55,12 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
   </div>
 
   <div class="card">
-    <h1>Check a Vehicle</h1>
+    <h1 id="stageTitle">Vehicle details</h1><p id="stageProgress" aria-live="polite">Step 1 of 2 — Vehicle</p>
     <p>Enter the vehicle details below. Registration number is the unique VPR reference and is required for every search.</p>
-<form method="post" action="search_process.php" autocomplete="off" id="vprSearchForm" data-usd-price="<?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>" data-zwg-price="<?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>">
+<form method="post" action="search_process.php" autocomplete="off" id="vprSearchForm" data-usd-mode="<?=htmlspecialchars(vpr_paynow_profile('USD',false)['environment'])?>" data-zwg-mode="<?=htmlspecialchars(vpr_paynow_profile('ZWG',false)['environment'])?>" data-usd-price="<?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>" data-zwg-price="<?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>">
 <input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>">
 <input type="hidden" name="checkout_key" value="<?=bin2hex(random_bytes(16))?>">
+<fieldset id="vehicleStage" style="border:0;padding:0;margin:0">
       <label for="registration_number">Registration Number</label>
       <input id="registration_number" name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Enter exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="e.g. AAA1111" value="<?= htmlspecialchars($_POST['registration_number'] ?? '') ?>">
 
@@ -131,6 +132,9 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
       <label for="chassis_number">Chassis Number <span class="optional">(optional)</span></label>
       <input id="chassis_number" name="chassis_number" placeholder="Enter if available" value="<?= htmlspecialchars($_POST['chassis_number'] ?? '') ?>">
 
+<button type="button" id="vprContinue">Continue to payment</button>
+</fieldset>
+<fieldset id="paymentStage" style="border:0;padding:0;margin:0" hidden disabled>
       <div class="field" style="margin-top:14px">
 <label for="payment_currency">Payment Currency</label>
 <select id="payment_currency" name="payment_currency" required>
@@ -146,11 +150,17 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 <select id="payment_method" name="payment_method">
 <option value="hosted">Choose on Paynow</option><option value="card">Visa / Mastercard — secure Paynow checkout</option>
 <option value="ecocash">EcoCash</option><option value="onemoney">OneMoney</option><option value="innbucks">InnBucks</option></select>
+<div id="testScenarioBox" hidden>
+<label for="test_scenario">Paynow test scenario</label>
+<select id="test_scenario" name="test_scenario"><option value="manual">Enter a number manually</option><option value="0771111111">Success — 0771111111</option><option value="0772222222">Delayed success — 0772222222</option><option value="0773333333">Customer cancels — 0773333333</option><option value="0774444444">Insufficient funds — 0774444444</option></select>
+<p class="hint">Test mode: use the integration owner's email. The selected scenario fills the mobile number below; no real money moves.</p></div>
 <label for="payer_phone">Mobile number <span id="phoneHint" class="optional">(optional)</span></label>
-<input type="tel" id="payer_phone" name="payer_phone" maxlength="20" autocomplete="tel" placeholder="e.g. 0771111111">
+<input type="tel" id="payer_phone" name="payer_phone" maxlength="20" autocomplete="tel" placeholder="Enter mobile number">
 <p class="hint" id="methodHint">Enter card details only on Paynow. Never enter a PIN or card number here.</p>
 </fieldset>
-<button type="button" id="vprPayButton">Check Vehicle</button><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
+<button type="button" id="vprBack" class="payclose">Back to vehicle</button>
+<button type="button" id="vprPayButton">Review payment</button><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
+    </fieldset>
     </form>
 
     <div class="notice"><strong>Important:</strong> A “No Interest Recorded on VPR” result means only that no applicable active interest is recorded in the VPR database at the time of the check. VPR does not replace official ownership, title, or statutory encumbrance checks.</div>
@@ -182,14 +192,14 @@ if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
     <div class="payprice" id="vprPayPrice">US$0.00</div>
     <p style="margin-top:0" id="vprPayCopy">Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the selected payment.</p>
     <div id="vprSpinner" class="spinner" style="display:none"></div>
-    <div id="vprPayStatus" class="paystatus">Click the payment button to continue securely to Paynow.</div>
+    <div id="vprPayStatus" class="paystatus" role="status" aria-live="polite">Click the payment button to continue securely to Paynow.</div>
     <a id="innbucksOpen" hidden>Open InnBucks app</a>
     <button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>
-    <button type="button" id="vprClosePay" class="payclose">Cancel</button>
+    <button type="button" id="vprClosePay" class="payclose">Back to payment details</button>
   </div>
 </div>
 
-<script src="assets/checkout.js" defer></script>
+<script src="assets/checkout.js?v=<?=filemtime(__DIR__.'/assets/checkout.js')?>" defer></script>
 
 
 </body>

@@ -36,8 +36,8 @@ $token = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
      }
      const terminal=['Cancelled','Failed','Expired'].includes(d.status);
      if(terminal)forget();
-     msg.textContent=terminal?'Payment '+d.status.toLowerCase()+'. No certificate has been issued.':
-       ((d.instructions?d.instructions+' ':'')+(d.message||'Payment status: '+d.status+'. Waiting for server verification; keep this reference.'));
+     msg.textContent=terminal?(d.message||'Payment '+d.status.toLowerCase()+'. No certificate has been issued.'):
+       (d.message||d.instructions||'Payment status: '+d.status+'. Waiting for server verification; keep this reference.');
      if(!terminal&&++attempts<60){clearTimeout(timer);timer=setTimeout(check,10000);}
    }catch(e){msg.textContent='Status temporarily unavailable. Check again using this same reference.';}
    finally{busy=false;button.disabled=false;}

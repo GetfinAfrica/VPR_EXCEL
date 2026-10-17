@@ -8,6 +8,22 @@
   const status = document.getElementById('vprPayStatus');
   const currency = document.getElementById('payment_currency');
   const method = document.getElementById('payment_method');
+  let stage=1;
+  const vehicleStage=document.getElementById('vehicleStage');
+  const paymentStage=document.getElementById('paymentStage');
+  function showStage(next) {
+    stage=next;vehicleStage.hidden=next!==1;paymentStage.hidden=next!==2;paymentStage.disabled=next!==2;
+    document.getElementById('stageTitle').textContent=next===1?'Vehicle details':'Payment details';
+    document.getElementById('stageProgress').textContent=next===1?'Step 1 of 2 — Vehicle':'Step 2 of 2 — Payment';
+  }
+  function goToPayment(){if(form.reportValidity()){showStage(2);updateDetails();}}
+  document.getElementById('vprContinue').addEventListener('click',goToPayment);
+  document.getElementById('vprBack').addEventListener('click',()=>showStage(1));
+  document.getElementById('test_scenario').addEventListener('change',function(){
+    const value=this.value;
+    if(testMode()&&['ecocash','onemoney'].includes(method.value)&&['0771111111','0772222222','0773333333','0774444444'].includes(value))document.getElementById('payer_phone').value=value;
+  });
+  function testMode(){return form.dataset[currency.value==='ZWG'?'zwgMode':'usdMode']==='test';}
   const isMobile = value => ['ecocash','onemoney','innbucks'].includes(value);
   function showAuthorization(data) {
     const link=document.getElementById('innbucksOpen');
@@ -19,6 +35,7 @@
     document.getElementById('checkoutDetails').disabled=free;
     document.getElementById('payer_phone').required=!free && isMobile(method.value);
     document.getElementById('phoneHint').textContent=isMobile(method.value)?'(required)':'(optional)';
+    document.getElementById('testScenarioBox').hidden=!(testMode()&&['ecocash','onemoney'].includes(method.value));
     document.getElementById('methodHint').textContent=isMobile(method.value)?'Approve the request on your phone. Never enter your wallet PIN here.':'Enter card details only on Paynow. Never enter a PIN or card number here.';
   }
   method.addEventListener('change',updateDetails); currency.addEventListener('change',updateDetails);
@@ -49,6 +66,7 @@
     }
   } catch (_) {}
   updateDetails();
+  showStage(payment||savedRequest?2:1);
   if (payment || savedRequest) {
     const recovery = document.createElement('p');
     const resume = document.createElement('a'); resume.href = payment ? returnUrl(payment) : '#vprSearchForm';
@@ -59,6 +77,7 @@
   }
   trigger.addEventListener('click', function () {
     if (busy) return;
+    if(stage===1){goToPayment();return;}
     if (payment) { window.location.href = returnUrl(payment); return; }
     if (!form.reportValidity()) return;
     const amount = form.dataset[currency.value === 'ZWG' ? 'zwgPrice' : 'usdPrice'];
@@ -70,7 +89,15 @@
     status.textContent = 'Continue to secure checkout. The server confirms the current fee.';
   });
   close.addEventListener('click', function () { modal.style.display = 'none'; clearTimeout(timer); });
-  form.addEventListener('submit', function (event) { event.preventDefault(); trigger.click(); });
+  form.addEventListener('submit', function (event) { event.preventDefault(); if(stage===1)goToPayment();else trigger.click(); });
+  function terminal(data){
+    if(!['Cancelled','Failed','Expired'].includes(data.status))return false;
+    status.textContent=data.message||data.instructions||('Payment '+data.status.toLowerCase()+'. No certificate issued.');
+    clearTimeout(timer);forget();payment=null;
+    form.elements.namedItem('checkout_key').value=window.crypto.randomUUID().replace(/-/g,'');
+    document.getElementById('vprOpenPaynowText').textContent='Try another payment';
+    if(popup&&!popup.closed)popup.close();return true;
+  }
   async function poll(manual=false) {
     if (!payment) return;
     try {
@@ -78,13 +105,13 @@
       const response = await fetch('paynow_status.php?ref=' + encodeURIComponent(payment.reference) + '&token=' + encodeURIComponent(payment.token), {cache: 'no-store',method:manual?'POST':'GET'});
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.message || 'Status temporarily unavailable.');
+      if(terminal(data))return;
       status.textContent = 'Reference ' + payment.reference + ': ' + data.status + '. ' + (data.instructions || '')+' '+(data.message || '');
       showAuthorization(data);
       if (data.paid && data.certificate_url) {
         forget(); if (popup && !popup.closed) popup.close();
         window.location.href = data.certificate_url; return;
       }
-      if (['Cancelled', 'Failed', 'Expired'].includes(data.status)) { forget(); return; }
       clearTimeout(timer); if (++attempts < 60) timer = setTimeout(poll, 10000);
     } catch (e) { status.textContent = e.message + ' Resume this payment to check again.'; }
     finally {if(manual)setBusy(false);}
@@ -106,6 +133,7 @@
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.message || 'Checkout unavailable.');
       payment = data; store(data);
+      if(terminal(data))return;
       showAuthorization(data);
       document.getElementById('vprPayPrice').textContent = label(data.currency) + ' ' + data.amount;
       if(isMobile(data.payment_method)) {

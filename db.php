@@ -63,11 +63,15 @@ function checkpoint_db($mode = 'PASSIVE') {
 
 
 function vpr_public_base_url(): string {
+    $configured=getenv('VPR_PUBLIC_URL');
+    if (is_string($configured) && trim($configured)!=='') return rtrim(trim($configured),'/');
     if (defined('VPR_PUBLIC_URL') && trim((string)VPR_PUBLIC_URL) !== '') {
         return rtrim((string)VPR_PUBLIC_URL, '/');
     }
     $host = preg_replace('/[^A-Za-z0-9.\-:]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
-    return 'https://' . $host;
+    $directory=rtrim(str_replace('\\','/',dirname($_SERVER['SCRIPT_NAME'] ?? '/')), '/');
+    if ($directory==='.' || $directory==='/') $directory='';
+    return 'https://' . $host . $directory;
 }
 
 function request_is_https(): bool {

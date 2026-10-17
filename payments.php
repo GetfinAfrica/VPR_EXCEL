@@ -317,8 +317,15 @@ function vpr_start_checkout(PDO $pdo, string $currency, array $details, string $
         $raw = $transport ? $transport($endpoint, $fields, 'init') : paynow_http_post($endpoint, $fields, 'init');
         $data = paynow_parse_response($raw);
         if (strtolower((string)paynow_get($data, 'status', '')) === 'error') {
-            // An unsigned error is not authoritative evidence that a transaction does not exist.
-            throw new RuntimeException('InitiationUnconfirmed');
+            // This is an explicit rejection from the approved HTTPS endpoint. Error
+            // payloads may be unsigned under Paynow's documented API. If a signature
+            // is supplied it must still verify; timeouts/invalid signatures stay Review.
+            if (trim((string)paynow_get($data,'error',''))==='' || (paynow_get($data,'hash')!==null && !paynow_validate_hash($data,$profile['key']))) throw new RuntimeException('InitiationUnconfirmed');
+            [$code,$message]=vpr_init_decline($data);
+            $pdo->prepare("UPDATE payments SET status='Failed',last_error=?,payment_instructions=?,updated_at=CURRENT_TIMESTAMP WHERE merchant_reference=? AND status='Created'")
+                ->execute([$code,$message,$reference]);
+            vpr_payment_event($pdo,$reference,'init',$code);
+            return vpr_payment($pdo,$reference);
         }
         if (!paynow_validate_hash($data, $profile['key']) || strtolower((string)paynow_get($data, 'status', '')) !== 'ok') {
             throw new RuntimeException('InitiationUnconfirmed');
@@ -344,6 +351,7 @@ function vpr_checkout_response(array $payment): array {
     return ['ok' => true, 'reference' => $payment['merchant_reference'], 'token' => $payment['return_token'],
         'currency' => $payment['currency'], 'amount' => $payment['expected_amount'], 'status' => $payment['status'],
         'browserurl' => $payment['browserurl'], 'payment_method'=>$payment['payment_method'],
+        'error_code'=>$payment['last_error'],'message'=>vpr_payment_message($payment),
         'instructions'=>$payment['payment_instructions'],'authorization_code'=>$payment['authorization_code'],'authorization_expires'=>$payment['authorization_expires'],
         'returnurl' => 'paynow_return.php?ref=' . urlencode($payment['merchant_reference']) . '&token=' . urlencode($payment['return_token'])];
 }
