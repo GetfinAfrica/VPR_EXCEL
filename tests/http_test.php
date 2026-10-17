@@ -25,7 +25,7 @@ try{
     preg_match('/name="csrf_token" value="([a-f0-9]+)"/',$body,$m);$csrf=$m[1]??'';
     expect_http(strlen($csrf)===64,'search form has CSRF protection');
     expect_http(strpos($body,'value="ZWG"')!==false&&strpos($body,'assets/checkout.js')!==false,'both currency options use shared checkout script');
-    $input=['csrf_token'=>$csrf,'registration_number'=>'TST1234','vehicle_brand'=>'Toyota','vehicle_model'=>'Hilux','payment_currency'=>'USD','quoted_amount'=>'1.00','checkout_key'=>str_repeat('a',32)];
+    $input=['csrf_token'=>$csrf,'registration_number'=>'TST1234','vehicle_brand'=>'Toyota','vehicle_model'=>'Hilux','payment_currency'=>'USD','quoted_amount'=>'1.00','payer_name'=>'Test Buyer','payer_email'=>'buyer@example.test','payer_phone'=>'','payment_method'=>'hosted','checkout_key'=>str_repeat('a',32)];
     [$code]=request('/search_process.php',$input);expect_http($code===403,'direct paid issuance rejected over HTTP');
     $bad=$input;$bad['csrf_token']='wrong';[$code]=request('/search_process.php',$bad);expect_http($code===403,'invalid CSRF rejected');
     $bad=$input;$bad['payment_currency']='EUR';[$code]=request('/paynow_create.php',$bad);expect_http($code===400,'unsupported checkout currency rejected');
@@ -38,7 +38,7 @@ try{
             $d=['status'=>'Ok','browserurl'=>'https://www.paynow.co.zw/Payment/ConfirmPayment/12345','pollurl'=>'https://www.paynow.co.zw/Interface/CheckPayment/?guid=fixture'];
             $d['hash']=paynow_create_hash($d,vpr_paynow_profile($ccy)['key']);return http_build_query($d);
         };
-        $p=vpr_start_checkout($pdo,$ccy,vpr_vehicle_request($input),$requestKey,$mock);
+        $p=vpr_start_checkout($pdo,$ccy,vpr_vehicle_request($input),$requestKey,$mock,null,vpr_checkout_details($input));
         [$code,$body]=request('/paynow_create.php',$input);$result=json_decode($body,true);
         expect_http($code===200&&($result['reference']??'')===$p['merchant_reference'],$ccy.' HTTP retry resumes existing checkout');
         expect_http(strpos($body,'fixture-'.$ccy.'-key')===false&&strpos($body,'integration_key')===false,'checkout JSON never exposes integration key');

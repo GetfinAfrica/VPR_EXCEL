@@ -24,7 +24,9 @@ try {
         if ($access) $url = 'certificate.php?id='.(int)$payment['search_id'].'&token='.urlencode($access);
     }
     echo json_encode(['ok'=>true,'paid'=>$paid && $url !== null,'status'=>$payment['status'],
-        'currency'=>$payment['currency'],'amount'=>$payment['expected_amount'],'certificate_url'=>$url,
+        'currency'=>$payment['currency'],'amount'=>$payment['expected_amount'],
+        'payment_method'=>$payment['payment_method'],'instructions'=>$payment['payment_instructions'],'certificate_url'=>$url,
+        'authorization_code'=>$payment['authorization_code'],'authorization_expires'=>$payment['authorization_expires'],
         'needs_review'=>!empty($payment['last_error']) || !empty($payment['reconciliation_note']),
         'message'=>!empty($payment['last_error']) ? 'Verification is pending. Keep this reference; contact VPR if the delay continues.' : null]);
 } catch (Throwable $e) {

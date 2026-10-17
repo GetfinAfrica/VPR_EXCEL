@@ -138,6 +138,18 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 <option value="ZWG">ZiG (ZWG) — <?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?></option>
 </select>
 </div>
+<fieldset id="checkoutDetails" style="border:0;padding:0;margin:12px 0">
+<legend style="font-weight:bold">Payment details</legend>
+<label for="payer_name">Full name</label><input id="payer_name" name="payer_name" maxlength="100" autocomplete="name" required>
+<label for="payer_email">Email address</label><input type="email" id="payer_email" name="payer_email" maxlength="254" autocomplete="email" required>
+<label for="payment_method">Payment method</label>
+<select id="payment_method" name="payment_method">
+<option value="hosted">Choose on Paynow</option><option value="card">Visa / Mastercard — secure Paynow checkout</option>
+<option value="ecocash">EcoCash</option><option value="onemoney">OneMoney</option><option value="innbucks">InnBucks</option></select>
+<label for="payer_phone">Mobile number <span id="phoneHint" class="optional">(optional)</span></label>
+<input type="tel" id="payer_phone" name="payer_phone" maxlength="20" autocomplete="tel" placeholder="e.g. 0771111111">
+<p class="hint" id="methodHint">Enter card details only on Paynow. Never enter a PIN or card number here.</p>
+</fieldset>
 <button type="button" id="vprPayButton">Check Vehicle</button><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
     </form>
 
@@ -171,6 +183,7 @@ if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
     <p style="margin-top:0" id="vprPayCopy">Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the selected payment.</p>
     <div id="vprSpinner" class="spinner" style="display:none"></div>
     <div id="vprPayStatus" class="paystatus">Click the payment button to continue securely to Paynow.</div>
+    <a id="innbucksOpen" hidden>Open InnBucks app</a>
     <button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>
     <button type="button" id="vprClosePay" class="payclose">Cancel</button>
   </div>

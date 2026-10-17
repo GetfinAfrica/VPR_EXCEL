@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/paynow_profiles.php';
+require_once __DIR__ . '/express_checkout.php';
 
 function vpr_checkout_schema(PDO $pdo): void {
     $columns = array_column($pdo->query('PRAGMA table_info(payments)')->fetchAll(PDO::FETCH_ASSOC), 'name');
@@ -8,6 +9,8 @@ function vpr_checkout_schema(PDO $pdo): void {
         'integration_profile' => 'TEXT', 'integration_id' => 'TEXT', 'integration_environment' => 'TEXT',
         'provider_status' => 'TEXT', 'verified_at' => 'TEXT', 'browserurl' => 'TEXT',
         'request_key' => 'TEXT', 'request_fingerprint' => 'TEXT', 'request_ip_hash' => 'TEXT',
+        'payer_name'=>'TEXT','payer_email'=>'TEXT','payer_phone'=>'TEXT','payment_instructions'=>'TEXT',
+        'authorization_code'=>'TEXT','authorization_expires'=>'TEXT',
         'last_polled_at' => 'INTEGER', 'poll_claim_until' => 'INTEGER', 'reconciliation_note' => 'TEXT'
     ];
     foreach ($add as $name => $type) {
@@ -90,7 +93,7 @@ function vpr_paynow_url(string $url, string $purpose): string {
     $path = strtolower($p['path'] ?? '');
     $prefix = $purpose === 'poll' ? '/interface/checkpayment/' : '/payment/';
     if ($purpose === 'init') {
-        if ($path !== '/interface/initiatetransaction') throw new RuntimeException('Unapproved Paynow endpoint.');
+        if (!in_array($path, ['/interface/initiatetransaction','/interface/remotetransaction'], true)) throw new RuntimeException('Unapproved Paynow endpoint.');
     } elseif (strpos($path, $prefix) !== 0 || strpos($path, '..') !== false || strpos($path, '%') !== false) {
         throw new RuntimeException('Unapproved Paynow endpoint.');
     }
@@ -261,10 +264,13 @@ function vpr_issue_free_search(PDO $pdo, string $currency, array $details): int 
     } catch (Throwable $e) { $pdo->exec('ROLLBACK'); throw $e; }
 }
 
-function vpr_start_checkout(PDO $pdo, string $currency, array $details, string $requestKey, ?callable $transport = null, ?string $quotedAmount = null): array {
+function vpr_start_checkout(PDO $pdo, string $currency, array $details, string $requestKey, ?callable $transport = null, ?string $quotedAmount = null, ?array $checkout = null): array {
     $currency = vpr_currency($currency);
     $profile = vpr_paynow_profile($currency);
-    $fingerprint = hash('sha256', json_encode([$currency, $details]));
+    $checkout = $checkout === null ? null : vpr_checkout_details($checkout);
+    $method=$checkout['payment_method'] ?? 'hosted';
+    $express=vpr_is_express($method);
+    $fingerprint = hash('sha256', json_encode([$currency, $details, $checkout]));
     $pdo->exec('BEGIN IMMEDIATE');
     try {
         $q = $pdo->prepare('SELECT * FROM payments WHERE request_key=?');
@@ -289,6 +295,8 @@ function vpr_start_checkout(PDO $pdo, string $currency, array $details, string $
             ->execute([$reference,$amount,$amount,$currency,$profile['name'],$profile['id'],$profile['environment'],
                 $token,$requestKey,$fingerprint,protected_ip_value(),$details['registration_number'],$details['vehicle_brand'],
                 $details['vehicle_model'],$details['chassis_number']]);
+        $pdo->prepare('UPDATE payments SET payment_method=?,payer_name=?,payer_email=?,payer_phone=? WHERE merchant_reference=?')
+            ->execute([$method,$checkout['payer_name'] ?? null,$checkout['payer_email'] ?? null,$checkout['payer_phone'] ?? null,$reference]);
         vpr_payment_event($pdo, $reference, 'init', 'Created');
         $pdo->exec('COMMIT');
     } catch (Throwable $e) { $pdo->exec('ROLLBACK'); throw $e; }
@@ -298,9 +306,15 @@ function vpr_start_checkout(PDO $pdo, string $currency, array $details, string $
         'additionalinfo' => 'VPR Vehicle Interest Search (' . $currency . ')',
         'returnurl' => $base . '/paynow_return.php?ref=' . urlencode($reference) . '&token=' . urlencode($token),
         'resulturl' => $base . '/paynow_result.php?ref=' . urlencode($reference), 'status' => 'Message'];
+    if ($checkout !== null) {
+        $fields['authname']=$checkout['payer_name'];
+        $fields['authemail']=$checkout['payer_email'];
+    }
+    if ($express) { $fields['method']=$method; $fields['phone']='0'.substr($checkout['payer_phone'],3); }
     $fields['hash'] = paynow_create_hash($fields, $profile['key']);
+    $endpoint=$express ? 'https://www.paynow.co.zw/interface/remotetransaction' : $profile['init_url'];
     try {
-        $raw = $transport ? $transport($profile['init_url'], $fields, 'init') : paynow_http_post($profile['init_url'], $fields, 'init');
+        $raw = $transport ? $transport($endpoint, $fields, 'init') : paynow_http_post($endpoint, $fields, 'init');
         $data = paynow_parse_response($raw);
         if (strtolower((string)paynow_get($data, 'status', '')) === 'error') {
             // An unsigned error is not authoritative evidence that a transaction does not exist.
@@ -309,15 +323,18 @@ function vpr_start_checkout(PDO $pdo, string $currency, array $details, string $
         if (!paynow_validate_hash($data, $profile['key']) || strtolower((string)paynow_get($data, 'status', '')) !== 'ok') {
             throw new RuntimeException('InitiationUnconfirmed');
         }
-        $browser = vpr_paynow_url((string)paynow_get($data, 'browserurl', ''), 'browser');
+        $browser = $express ? null : vpr_paynow_url((string)paynow_get($data, 'browserurl', ''), 'browser');
+        $instructions=$express ? vpr_express_instructions($data,$method) : null;
         $poll = vpr_paynow_url((string)paynow_get($data, 'pollurl', ''), 'poll');
         // A callback can arrive before initiation finishes. Never downgrade its state.
         $pdo->prepare("UPDATE payments SET browserurl=?,pollurl=?,status=CASE WHEN status='Created' THEN 'Initiated' ELSE status END,
             updated_at=CURRENT_TIMESTAMP WHERE merchant_reference=?") ->execute([$browser,$poll,$reference]);
+        $pdo->prepare('UPDATE payments SET payment_instructions=?,authorization_code=?,authorization_expires=? WHERE merchant_reference=?')
+            ->execute([$instructions,$method==='innbucks'?paynow_get($data,'authorizationcode'):null,$method==='innbucks'?paynow_get($data,'authorizationexpires'):null,$reference]);
         vpr_payment_event($pdo, $reference, 'init', 'Initiated');
     } catch (Throwable $e) {
         $pdo->prepare("UPDATE payments SET status=CASE WHEN status='Created' THEN 'Review' ELSE status END,
-            last_error='InitiationUnconfirmed',updated_at=CURRENT_TIMESTAMP WHERE merchant_reference=?") ->execute([$reference]);
+            last_error='InitiationUnconfirmed',payment_instructions=COALESCE(payment_instructions,'Paynow could not confirm initiation. Keep this reference and contact VPR before trying another payment.'),updated_at=CURRENT_TIMESTAMP WHERE merchant_reference=?") ->execute([$reference]);
         vpr_payment_event($pdo, $reference, 'init', 'InitiationUnconfirmed');
     }
     return vpr_payment($pdo, $reference);
@@ -326,6 +343,7 @@ function vpr_start_checkout(PDO $pdo, string $currency, array $details, string $
 function vpr_checkout_response(array $payment): array {
     return ['ok' => true, 'reference' => $payment['merchant_reference'], 'token' => $payment['return_token'],
         'currency' => $payment['currency'], 'amount' => $payment['expected_amount'], 'status' => $payment['status'],
-        'browserurl' => $payment['browserurl'],
+        'browserurl' => $payment['browserurl'], 'payment_method'=>$payment['payment_method'],
+        'instructions'=>$payment['payment_instructions'],'authorization_code'=>$payment['authorization_code'],'authorization_expires'=>$payment['authorization_expires'],
         'returnurl' => 'paynow_return.php?ref=' . urlencode($payment['merchant_reference']) . '&token=' . urlencode($payment['return_token'])];
 }

@@ -9,6 +9,7 @@ try {
     if (!verify_csrf($_POST['csrf_token'] ?? '')) { http_response_code(403); exit; }
     $currency = vpr_currency($_POST['payment_currency'] ?? '');
     $details = vpr_vehicle_request($_POST);
+    $checkout = vpr_checkout_details($_POST);
     $key = $_POST['checkout_key'] ?? '';
     if (!is_string($key) || !preg_match('/^[a-f0-9]{32}$/D', $key)) throw new InvalidArgumentException('Invalid checkout request.');
     $requestKey = hash_hmac('sha256', $key, csrf_token());
@@ -16,7 +17,7 @@ try {
     if (!is_string($quote)) throw new InvalidArgumentException('Invalid quoted fee.');
     vpr_money_minor($quote);
     session_write_close();
-    echo json_encode(vpr_checkout_response(vpr_start_checkout(db(), $currency, $details, $requestKey, null, $quote)), JSON_UNESCAPED_SLASHES);
+    echo json_encode(vpr_checkout_response(vpr_start_checkout(db(), $currency, $details, $requestKey, null, $quote, $checkout)), JSON_UNESCAPED_SLASHES);
 } catch (InvalidArgumentException $e) {
     http_response_code(400); echo json_encode(['ok'=>false,'message'=>$e->getMessage()]);
 } catch (Throwable $e) {

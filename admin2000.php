@@ -182,7 +182,7 @@ $revenue=['USD'=>0,'ZWG'=>0];
 foreach ($pdo->query("SELECT currency,expected_amount FROM payments WHERE status='Paid' AND verified_at IS NOT NULL AND search_id IS NOT NULL AND reconciliation_note IS NULL")->fetchAll(PDO::FETCH_ASSOC) as $row) {
     if (isset($revenue[$row['currency']])) $revenue[$row['currency']] += vpr_money_minor($row['expected_amount']);
 }
-$recentPayments=$pdo->query("SELECT merchant_reference,paynow_reference,registration_number,amount,expected_amount,provider_amount,currency,provider_currency,integration_id,integration_environment,status,provider_status,reconciliation_note,created_at,paid_at,last_error FROM payments ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+$recentPayments=$pdo->query("SELECT merchant_reference,paynow_reference,registration_number,payment_method,amount,expected_amount,provider_amount,currency,provider_currency,integration_id,integration_environment,status,provider_status,reconciliation_note,created_at,paid_at,last_error FROM payments ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 
 $searchesWeek=(int)$pdo->query("SELECT COUNT(*) FROM searches WHERE date(searched_at) >= date('now','localtime','-6 days')")->fetchColumn();
 $searchesMonth=(int)$pdo->query("SELECT COUNT(*) FROM searches WHERE strftime('%Y-%m',searched_at)=strftime('%Y-%m','now','localtime')")->fetchColumn();
@@ -441,7 +441,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <td><?=htmlspecialchars($pmt['paynow_reference'] ?: '-')?></td>
 <td><?=htmlspecialchars($pmt['registration_number'])?></td>
 <td><?=htmlspecialchars($pmt['currency'])?> <?=htmlspecialchars($pmt['expected_amount'] ?? 'Legacy: unknown')?><br><?=htmlspecialchars($pmt['provider_amount'] ?? '-')?> <?=htmlspecialchars($pmt['provider_currency'] ?? 'profile-bound')?></td>
-<td><?=htmlspecialchars($pmt['integration_id'] ?? 'legacy')?> / <?=htmlspecialchars($pmt['integration_environment'] ?? 'unknown')?></td>
+<td><?=htmlspecialchars($pmt['integration_id'] ?? 'legacy')?> / <?=htmlspecialchars($pmt['integration_environment'] ?? 'unknown')?><br><?=htmlspecialchars($pmt['payment_method'] ?? 'hosted')?></td>
 <td><?=htmlspecialchars($pmt['status'])?></td>
 <td><?=htmlspecialchars($pmt['reconciliation_note'] ?: ($pmt['last_error'] ?: '-'))?></td>
 </tr>

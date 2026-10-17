@@ -8,7 +8,7 @@ $token = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
 <style>body{font:16px Arial;background:#f5f7f9;padding:30px;color:#17212b}.box{max-width:560px;margin:auto;background:white;border:1px solid #dfe5ea;border-radius:14px;padding:26px;text-align:center}button{padding:12px 20px;cursor:pointer}p{overflow-wrap:anywhere}</style>
 </head><body><div class="box"><img src="assets/vpr-logo.png" alt="VPR" style="max-width:280px;width:80%">
 <h2>Payment status</h2><p>Reference: <strong><?=htmlspecialchars($ref)?></strong></p>
-<p id="amount"></p><p id="msg">Waiting for verified payment confirmation.</p>
+<p id="amount"></p><p id="msg">Waiting for verified payment confirmation.</p><p><a id="innbucks-app" hidden>Open InnBucks app</a></p>
 <button id="check" type="button">Check status again</button><p><a id="new-search" href="index.php">New vehicle search</a></p></div>
 <script>
 (function(){
@@ -25,6 +25,9 @@ $token = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
      const d=await r.json();
      if(!r.ok||!d.ok){msg.textContent=d.message||'Unable to check status.';return;}
      document.getElementById('amount').textContent=(d.currency==='ZWG'?'ZiG (ZWG)':d.currency)+' '+(d.amount||'');
+     const app=document.getElementById('innbucks-app');
+     app.hidden=!(d.payment_method==='innbucks'&&typeof d.authorization_code==='string'&&/^[A-Za-z0-9-]{1,100}$/.test(d.authorization_code));
+     if(!app.hidden)app.href='com.innbucks.customer://purchase?paymentToken='+encodeURIComponent(d.authorization_code);
      if(d.paid&&d.certificate_url){
        forget();
        clearTimeout(timer);
@@ -34,7 +37,7 @@ $token = is_string($_GET['token'] ?? null) ? $_GET['token'] : '';
      const terminal=['Cancelled','Failed','Expired'].includes(d.status);
      if(terminal)forget();
      msg.textContent=terminal?'Payment '+d.status.toLowerCase()+'. No certificate has been issued.':
-       (d.message||'Payment status: '+d.status+'. Waiting for server verification; keep this reference.');
+       ((d.instructions?d.instructions+' ':'')+(d.message||'Payment status: '+d.status+'. Waiting for server verification; keep this reference.'));
      if(!terminal&&++attempts<60){clearTimeout(timer);timer=setTimeout(check,10000);}
    }catch(e){msg.textContent='Status temporarily unavailable. Check again using this same reference.';}
    finally{busy=false;button.disabled=false;}

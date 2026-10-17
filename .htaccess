@@ -36,7 +36,7 @@ RewriteRule "(^|/)\." - [F,L]
   </IfModule>
 </FilesMatch>
 
-<FilesMatch "^(config\.php|db\.php|payments\.php|paynow_profiles\.php|composer\.(json|lock)|.*\.(sqlite|sqlite3|db|bak|backup|log|ini|env|sql|sh|pem|key|crt|old|orig))$">
+<FilesMatch "^(config\.php|db\.php|payments\.php|paynow_profiles\.php|express_checkout\.php|composer\.(json|lock)|.*\.(sqlite|sqlite3|db|bak|backup|log|ini|env|sql|sh|pem|key|crt|old|orig))$">
   Require all denied
 </FilesMatch>
 

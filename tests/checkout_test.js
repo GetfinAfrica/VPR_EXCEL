@@ -8,13 +8,15 @@ function fixture({saved = null, request = null, blocked = false, fail = false} =
   if (saved) store.set('vpr.pendingCheckout', JSON.stringify(saved));
   if (request) store.set('vpr.checkoutRequest', JSON.stringify(request));
   function node() { return {style: {}, handlers: {}, value: '', addEventListener(k, fn) {this.handlers[k] = fn;}, append() {}, remove() {}}; }
-  const names = ['csrf_token', 'checkout_key', 'registration_number', 'vehicle_brand', 'vehicle_model', 'payment_currency'];
+  const names = ['csrf_token', 'checkout_key', 'registration_number', 'vehicle_brand', 'vehicle_model', 'payment_currency','payment_method'];
   const fields = Object.fromEntries(names.map(n => [n, {value: n === 'payment_currency' ? 'USD' : (n === 'checkout_key' ? 'a'.repeat(32) : 'fixture')}]));
   const form = node();
   form.dataset = {usdPrice: '1.00', zwgPrice: '2.00'};
   form.elements = {namedItem: n => fields[n]}; form.reportValidity = () => true;
   form.submit = () => events.push('submit'); form.before = () => {};
   nodes.set('vprSearchForm', form); nodes.set('payment_currency', fields.payment_currency);
+  fields.payment_method=node();fields.payment_method.value='hosted';fields.payment_method.options=[{text:'EcoCash'}];fields.payment_method.selectedIndex=0;
+  nodes.set('payment_method',fields.payment_method);fields.payment_currency.addEventListener=()=>{};
   const popup = {closed: false, close() {this.closed = true;}, location: {replace(url) {events.push('navigate:' + url);}}};
   const window = {location: {origin: 'http://localhost', href: '', reload() {}},
     addEventListener() {}, open() {events.push('open'); return blocked ? null : popup;}};
@@ -26,7 +28,7 @@ function fixture({saved = null, request = null, blocked = false, fail = false} =
       events.push('fetch:' + url);
       if (fail) throw new Error('Network interruption');
       return {ok: true, async json() {return url === 'paynow_create.php' ?
-        {ok:true,reference:'VPR-test',token:'fixture-token',currency:fields.payment_currency.value,amount:'2.00',browserurl:'https://www.paynow.co.zw/Payment/ConfirmPayment/123'} :
+        {ok:true,reference:'VPR-test',token:'fixture-token',currency:fields.payment_currency.value,payment_method:fields.payment_method.value,instructions:'Approve on phone',amount:'2.00',browserurl:fields.payment_method.value==='ecocash'?null:'https://www.paynow.co.zw/Payment/ConfirmPayment/123'} :
         {ok:true,status:'Pending',paid:false};}};
     }};
   vm.runInNewContext(source, context);
@@ -53,5 +55,9 @@ function fixture({saved = null, request = null, blocked = false, fail = false} =
   assert(failure.store.has('vpr.checkoutRequest')); assert(!failure.nodes.get('vprOpenPaynow').disabled); ++checks;
   const free = fixture(); free.nodes.get('vprSearchForm').dataset.usdPrice = '0.00'; await free.click('vprPayButton');
   assert.deepEqual(free.events,['submit']); ++checks;
+  const mobile=fixture();mobile.fields.payment_method.value='ecocash';await mobile.click('vprPayButton');await mobile.click('vprOpenPaynow');
+  assert(!mobile.events.includes('open'));assert.equal(mobile.window.location.href,'');++checks;
+  assert(mobile.nodes.get('vprPayStatus').textContent.includes('Approve on phone'));++checks;
+  await mobile.click('vprOpenPaynow');assert.equal(mobile.events.filter(x=>x==='fetch:paynow_create.php').length,1);++checks;
   console.log(`PASS: ${checks} browser-flow checks (popup timing, ZWG, recovery, retries, free search).`);
 })().catch(e => {console.error(e); process.exitCode = 1;});
