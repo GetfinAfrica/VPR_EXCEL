@@ -3,8 +3,9 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync(require('node:path').join(__dirname, '../assets/checkout.js'), 'utf8');
 let checks = 0;
-function fixture({saved = null, request = null, blocked = false, fail = false} = {}) {
-  const events = [], nodes = new Map(), store = new Map();
+function fixture({saved = null, request = null, blocked = false, fail = false, statusReplies=[]} = {}) {
+  const events = [], nodes = new Map(), store = new Map(), timers=new Map(), requests=[];
+  let nextTimer=0;
   if (saved) store.set('vpr.pendingCheckout', JSON.stringify(saved));
   if (request) store.set('vpr.checkoutRequest', JSON.stringify(request));
   function node() { return {style: {}, handlers: {}, value: '', addEventListener(k, fn) {this.handlers[k] = fn;}, click(){return this.handlers.click?.();}, append() {}, remove() {}}; }
@@ -24,16 +25,18 @@ function fixture({saved = null, request = null, blocked = false, fail = false} =
   const context = {window, document: {getElementById(id) {if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id);}, createElement: node},
     sessionStorage: {getItem: k => store.get(k), setItem(k, v) {events.push('persist:' + k); store.set(k, v);}, removeItem: k => store.delete(k)},
     FormData: class {constructor() {this.values = Object.entries(fields).map(([k,v]) => [k,v.value]);} entries() {return this.values;} set(k,v) {const found=this.values.find(([n])=>n===k); if(found)found[1]=v;else this.values.push([k,v]);} get(k) {return this.values.find(([n]) => n === k)[1];}},
-    setTimeout: () => 1, clearTimeout() {}, console,
-    async fetch(url) {
+    setTimeout: fn => {timers.set(++nextTimer,fn);return nextTimer;}, clearTimeout(id) {timers.delete(id);}, console,
+    async fetch(url, options) {
+      requests.push({url,method:options.method});
       events.push('fetch:' + url);
       if (fail) throw new Error('Network interruption');
+      if(url!=='paynow_create.php'&&statusReplies.length){const reply=statusReplies.shift();if(reply instanceof Error)throw reply;return {ok:true,json:async()=>reply};}
       return {ok: true, async json() {return url === 'paynow_create.php' ?
         {ok:true,reference:'VPR-test',token:'fixture-token',currency:fields.payment_currency.value,payment_method:fields.payment_method.value,instructions:'Approve on phone',amount:'2.00',browserurl:fields.payment_method.value==='ecocash'?null:'https://www.paynow.co.zw/Payment/ConfirmPayment/123'} :
         {ok:true,status:'Pending',paid:false};}};
     }};
   vm.runInNewContext(source, context);
-  return {events, nodes, fields, window, store, click: id => nodes.get(id).handlers.click()};
+  return {events, nodes, fields, window, store, requests, timers, async tick(){const first=timers.entries().next().value;if(!first)throw new Error('No automatic check scheduled');timers.delete(first[0]);await first[1]();},click: id => nodes.get(id).handlers.click()};
 }
 (async function () {
   const stages=fixture();
@@ -59,7 +62,7 @@ function fixture({saved = null, request = null, blocked = false, fail = false} =
   assert(blocked.window.location.href.startsWith('https://www.paynow.co.zw/')); ++checks;
   const recovered = fixture({saved: {reference:'VPR-old', token:'old-token'}});
   assert(!recovered.events.some(e => e.startsWith('fetch:'))); ++checks;
-  await recovered.click('vprPayButton'); assert(recovered.window.location.href.includes('ref=VPR-old')); ++checks;
+  await recovered.click('vprPayButton'); assert.equal(recovered.nodes.get('vprPayModal').style.display,'flex');assert(recovered.nodes.get('vprOpenPaynow').hidden);assert(!recovered.events.includes('fetch:paynow_create.php')); ++checks;
   const lost = fixture({request: {checkout_key:'b'.repeat(32), fields:{payment_currency:'ZWG',registration_number:'TST1234'}}});
   assert.equal(lost.fields.checkout_key.value, 'b'.repeat(32)); assert.equal(lost.fields.payment_currency.value,'ZWG'); ++checks;
   const failure = fixture({fail:true}); await failure.click('vprContinue'); await failure.click('vprPayButton'); await failure.click('vprOpenPaynow');
@@ -70,5 +73,14 @@ function fixture({saved = null, request = null, blocked = false, fail = false} =
   assert(!mobile.events.includes('open'));assert.equal(mobile.window.location.href,'');++checks;
   assert(mobile.nodes.get('vprPayStatus').textContent.includes('Approve on phone'));++checks;
   await mobile.click('vprOpenPaynow');assert.equal(mobile.events.filter(x=>x==='fetch:paynow_create.php').length,1);++checks;
+  const automatic=fixture({statusReplies:[{ok:true,status:'Pending',paid:false},{ok:true,status:'Paid',paid:true,certificate_url:'certificate.php?id=123'}]});
+  automatic.fields.payment_method.value='ecocash';await automatic.click('vprContinue');await automatic.click('vprPayButton');await automatic.click('vprOpenPaynow');
+  assert.equal(automatic.nodes.get('vprSpinner').style.display,'block');assert.equal(automatic.nodes.get('vprOpenPaynow').hidden,true);++checks;
+  await automatic.tick();assert.equal(automatic.requests.at(-1).method,'POST');assert(automatic.timers.size>0);++checks;
+  await automatic.tick();assert.equal(automatic.window.location.href,'certificate.php?id=123');assert.equal(automatic.nodes.get('vprSpinner').style.display,'none');assert.equal(automatic.timers.size,0);++checks;
+  const retrying=fixture({statusReplies:[new Error('Offline'),{ok:true,status:'Cancelled',paid:false}]});
+  retrying.fields.payment_method.value='ecocash';await retrying.click('vprContinue');await retrying.click('vprPayButton');await retrying.click('vprOpenPaynow');
+  await retrying.tick();assert(retrying.nodes.get('vprPayStatus').textContent.includes('Retrying automatically'));assert(retrying.timers.size>0);++checks;
+  await retrying.tick();assert.equal(retrying.nodes.get('vprSpinner').style.display,'none');assert.equal(retrying.nodes.get('vprOpenPaynow').hidden,false);assert.equal(retrying.timers.size,0);++checks;
   console.log(`PASS: ${checks} browser-flow checks (popup timing, ZWG, recovery, retries, free search).`);
 })().catch(e => {console.error(e); process.exitCode = 1;});

@@ -28,6 +28,7 @@ h1{font-size:27px;color:var(--navy);margin:0 0 8px}p{line-height:1.55}
 label{display:block;font-weight:700;margin:16px 0 6px}.optional{font-weight:400;color:var(--muted)}
 input,select{width:100%;padding:13px 14px;border:1px solid #cbd5df;border-radius:9px;font-size:16px;background:#fff}
 input:focus,select:focus{outline:2px solid rgba(184,138,38,.25);border-color:var(--gold)}
+.currency-picker{border:0;padding:0;margin:0}.currency-picker legend{font-weight:700;margin-bottom:10px}.currency-options{display:grid;width:min(100%,300px);grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:#eef2f6;border:1px solid var(--line);border-radius:13px}.currency-option{position:relative;margin:0;cursor:pointer}.currency-option input{position:absolute;opacity:0;width:1px;height:1px;padding:0}.currency-option span{display:flex;flex-direction:column;gap:3px;padding:7px 10px;border:2px solid transparent;border-radius:9px;color:var(--muted);transition:background .15s,color .15s}.currency-option strong{font-size:15px}.currency-option small{font-size:11px;font-weight:400}.currency-option input:checked+span{background:var(--navy);border-color:var(--navy);color:#fff;box-shadow:0 3px 9px rgba(6,44,82,.16)}.currency-option input:checked+span strong:after{content:' ✓';color:var(--gold2)}.currency-option input:focus-visible+span{outline:3px solid var(--gold);outline-offset:2px}.currency-summary{margin:12px 0 0;padding:11px 14px;border-left:3px solid var(--gold);background:#f5f8fb;color:var(--navy);font-size:14px}
 button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;border:0;border-radius:9px;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;font-weight:700;font-size:16px;cursor:pointer;text-decoration:none;text-align:center}
 .result{margin-top:24px;padding:20px;border-radius:12px}.success{background:var(--okbg);color:var(--ok);border:1px solid #bedfce}.warning{background:var(--warnbg);color:var(--warn);border:1px solid #efc9c9}.error{background:#fff6e8;color:#8a5515;border:1px solid #efd8ad}
 .kv{margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.08)}.kv div{margin:7px 0}
@@ -136,11 +137,15 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 </fieldset>
 <fieldset id="paymentStage" style="border:0;padding:0;margin:0" hidden disabled>
       <div class="field" style="margin-top:14px">
-<label for="payment_currency">Payment Currency</label>
-<select id="payment_currency" name="payment_currency" required>
-<option value="USD">USD — US$<?=number_format($usdPrice,2) ?></option>
-<option value="ZWG">ZiG (ZWG) — <?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?></option>
-</select>
+<fieldset class="currency-picker">
+<legend>Payment currency</legend>
+<input type="hidden" id="payment_currency" name="payment_currency" value="USD">
+<div class="currency-options">
+<label class="currency-option"><input type="radio" id="currencyUSD" name="currency_choice" value="USD" checked aria-describedby="currencySummary"><span><strong>USD</strong><small>US dollars · <?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?></small></span></label>
+<label class="currency-option"><input type="radio" id="currencyZWG" name="currency_choice" value="ZWG" aria-describedby="currencySummary"><span><strong>ZWG</strong><small>ZiG · <?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?></small></span></label>
+</div>
+<p id="currencySummary" class="currency-summary" role="status" aria-live="polite">You will pay USD <?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>.</p>
+</fieldset>
 </div>
 <fieldset id="checkoutDetails" style="border:0;padding:0;margin:12px 0">
 <legend style="font-weight:bold">Payment details</legend>
@@ -191,7 +196,8 @@ if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
     <h2 style="color:#062c52;margin-bottom:4px">Complete Vehicle Check</h2>
     <div class="payprice" id="vprPayPrice">US$0.00</div>
     <p style="margin-top:0" id="vprPayCopy">Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the selected payment.</p>
-    <div id="vprSpinner" class="spinner" style="display:none"></div>
+    <div id="vprSpinner" class="spinner" style="display:none" aria-hidden="true"></div>
+    <div id="vprProgress" hidden role="status" aria-live="polite"><strong id="vprProgressTitle">Waiting for payment approval</strong><p class="hint">Keep this page open. We check Paynow automatically and open your certificate once payment is verified.</p></div>
     <div id="vprPayStatus" class="paystatus" role="status" aria-live="polite">Click the payment button to continue securely to Paynow.</div>
     <a id="innbucksOpen" hidden>Open InnBucks app</a>
     <button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>

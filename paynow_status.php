@@ -11,11 +11,12 @@ try {
         http_response_code(403); echo json_encode(['ok'=>false,'message'=>'Payment access denied.']); exit;
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // Explicit customer reconciliation, using the same reference rather than a new charge.
-        try { vpr_poll_payment($pdo, $ref, true); } catch (Throwable $ignored) {}
+        // Authenticated browser reconciliation (automatic or manual). The provider
+        // poll has a shared ten-second rate limit and never initiates another charge.
+        try { vpr_poll_payment($pdo, $ref); } catch (Throwable $ignored) {}
         $payment = vpr_payment($pdo, $ref);
     }
-    // Browser reads persisted state. Callbacks and CLI reconciliation verify with Paynow.
+    // GET reads persisted state; POST above reconciles with Paynow before responding.
     $paid = $payment['status'] === 'Paid' && !empty($payment['verified_at']) && !empty($payment['search_id']);
     $url = null;
     if ($paid) {

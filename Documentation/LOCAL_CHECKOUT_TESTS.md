@@ -23,8 +23,11 @@ The port 8088 launcher imports Paynow credentials from the Windows user environm
 
 The XAMPP configuration retains its existing HTTPS enforcement. `http://localhost/VPR_EXCEL/` may redirect to `https://localhost/VPR_EXCEL/`. Do not put secrets in `.htaccess` or a committed file. Neither source checkout's ignored `config.php` nor either registry database is overwritten by source synchronization.
 
-Tests: existing payment/HTTP/express suites plus `tests/scenarios_test.php` and `node tests/checkout_test.js`. Live callback delivery still requires a public HTTPS deployment. On localhost, explicitly use Check Payment Status or the reconciler to verify provider changes.
+Tests: existing payment/HTTP/express suites plus `tests/scenarios_test.php` and `node tests/checkout_test.js`. Live callback delivery still requires a public HTTPS deployment. The checkout and return page now reconcile automatically with Paynow every ten seconds while open, including on localhost. The shared server rate limit prevents overlapping provider polls. The CLI reconciler remains available for unattended payments.
 
 Provider reference: https://developers.paynow.co.zw/docs/paynow/test_mode/
 
 Verified 17 October 2026: 283 automated checks pass. Eight actual Paynow test requests through port 8088 (four scenarios per currency) settled as expected: four Paid with certificates, two Cancelled without certificates, two Failed/InsufficientFunds without certificates. Apache runtime confirms both test profiles loaded after restart. A separate HTTPS matrix through Apache is blocked by the expired XAMPP localhost certificate; the verification client refused it. Renew the local certificate before repeating that HTTPS matrix. No Paynow TLS validation was disabled.
+
+
+Automatic progress update, 17 October 2026: the pending checkout shows an animated spinner and status text instead of a manual check button. Network interruptions retry the same payment automatically; terminal results stop the spinner. After ten minutes without confirmation, the user may resume checks for the same reference. Closing the modal pauses its checks; reopening resumes the saved payment without another initiation. The return page also checks automatically. Verified with 27 browser-flow checks and 26 HTTP checks, plus an actual Paynow USD delayed-success EcoCash test that opened the correct AUT1234 certificate without any further click. These are test-mode payments, not real card authorisations.

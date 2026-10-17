@@ -8,6 +8,11 @@
   const status = document.getElementById('vprPayStatus');
   const currency = document.getElementById('payment_currency');
   const method = document.getElementById('payment_method');
+  for(const code of ['USD','ZWG']){
+    document.getElementById('currency'+code).addEventListener('change',function(){
+      if(this.checked){currency.value=code;updateDetails();}
+    });
+  }
   let stage=1;
   const vehicleStage=document.getElementById('vehicleStage');
   const paymentStage=document.getElementById('paymentStage');
@@ -32,6 +37,11 @@
   }
   function updateDetails() {
     const free=form.dataset[currency.value === 'ZWG' ? 'zwgPrice' : 'usdPrice']==='0.00';
+    for(const code of ['USD','ZWG'])document.getElementById('currency'+code).checked=currency.value===code;
+    const total=label(currency.value)+' '+form.dataset[currency.value==='ZWG'?'zwgPrice':'usdPrice'];
+    const paymentMethod=method.value==='hosted'?'Paynow':(method.value==='card'?'Visa / Mastercard':method.options[method.selectedIndex].text);
+    document.getElementById('currencySummary').textContent=free?'This vehicle check is free. No payment is required.':'You will pay '+total+' via '+paymentMethod+'.';
+    trigger.textContent=free?'Check vehicle — free':'Review '+total+' payment';
     document.getElementById('checkoutDetails').disabled=free;
     document.getElementById('payer_phone').required=!free && isMobile(method.value);
     document.getElementById('phoneHint').textContent=isMobile(method.value)?'(required)':'(optional)';
@@ -39,7 +49,7 @@
     document.getElementById('methodHint').textContent=isMobile(method.value)?'Approve the request on your phone. Never enter your wallet PIN here.':'Enter card details only on Paynow. Never enter a PIN or card number here.';
   }
   method.addEventListener('change',updateDetails); currency.addEventListener('change',updateDetails);
-  let payment = null, popup = null, busy = false, timer = null, attempts = 0;
+  let payment = null, popup = null, busy = false, timer = null, attempts = 0, watching = false, polling = false;
   const storageKey = 'vpr.pendingCheckout';
   const requestStorageKey = 'vpr.checkoutRequest';
   let savedRequest = null;
@@ -51,7 +61,26 @@
   }
   function setBusy(on) {
     busy = on; open.disabled = on; trigger.disabled = on; close.disabled = on;
-    document.getElementById('vprSpinner').style.display = on ? 'block' : 'none';
+    document.getElementById('vprSpinner').style.display = on || watching ? 'block' : 'none';
+    open.hidden=watching;
+  }
+  function setWatching(on,title='Waiting for payment approval'){
+    watching=on;open.hidden=on;document.getElementById('vprProgress').hidden=!on;
+    document.getElementById('vprProgressTitle').textContent=title;
+    document.getElementById('vprSpinner').style.display=on||busy?'block':'none';
+  }
+  function waitingMessage(data){
+    const instruction=(data.message||data.instructions||'Complete your payment approval.').replace('Keep this page open, then check status.','Keep this page open.');
+    status.textContent='Reference '+payment.reference+'. '+instruction;
+  }
+  function schedulePoll(){
+    clearTimeout(timer);
+    if(!watching||!payment)return;
+    if(++attempts>=60){
+      setWatching(false);document.getElementById('vprOpenPaynowText').textContent='Resume automatic checks';
+      status.textContent='Payment has not been confirmed yet. Keep reference '+payment.reference+'. You can resume automatic checks for this same payment.';return;
+    }
+    timer=setTimeout(poll,10000);
   }
   try {
     const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
@@ -78,47 +107,55 @@
   trigger.addEventListener('click', function () {
     if (busy) return;
     if(stage===1){goToPayment();return;}
-    if (payment) { window.location.href = returnUrl(payment); return; }
+    if (payment) {
+      modal.style.display='flex';document.getElementById('vprPayPrice').textContent=label(payment.currency||currency.value)+' '+(payment.amount||'');
+      setWatching(true);waitingMessage(payment);attempts=0;poll();return;
+    }
     if (!form.reportValidity()) return;
     const amount = form.dataset[currency.value === 'ZWG' ? 'zwgPrice' : 'usdPrice'];
     if (amount === '0.00') { form.submit(); return; }
     modal.style.display = 'flex';
     document.getElementById('vprPayPrice').textContent = label(currency.value) + ' ' + amount;
-    document.getElementById('vprOpenPaynowText').textContent = isMobile(method.value) ? 'Request '+method.options[method.selectedIndex].text+' payment' : 'Continue to Paynow';
+    document.getElementById('vprOpenPaynowText').textContent = isMobile(method.value) ? 'Request '+label(currency.value)+' '+amount+' via '+method.options[method.selectedIndex].text : 'Pay '+label(currency.value)+' '+amount+' with '+(method.value==='card'?'Visa / Mastercard':'Paynow');
     document.getElementById('vprPayCopy').textContent = 'Your certificate is released only after VPR verifies payment.';
     status.textContent = 'Continue to secure checkout. The server confirms the current fee.';
   });
-  close.addEventListener('click', function () { modal.style.display = 'none'; clearTimeout(timer); });
+  close.addEventListener('click', function () { modal.style.display = 'none'; clearTimeout(timer);setWatching(false); });
   form.addEventListener('submit', function (event) { event.preventDefault(); if(stage===1)goToPayment();else trigger.click(); });
   function terminal(data){
     if(!['Cancelled','Failed','Expired'].includes(data.status))return false;
     status.textContent=data.message||data.instructions||('Payment '+data.status.toLowerCase()+'. No certificate issued.');
-    clearTimeout(timer);forget();payment=null;
+    clearTimeout(timer);setWatching(false);forget();payment=null;
+    document.getElementById('innbucksOpen').hidden=true;
     form.elements.namedItem('checkout_key').value=window.crypto.randomUUID().replace(/-/g,'');
     document.getElementById('vprOpenPaynowText').textContent='Try another payment';
     if(popup&&!popup.closed)popup.close();return true;
   }
-  async function poll(manual=false) {
-    if (!payment) return;
+  async function poll() {
+    if (!payment || polling || !watching) return;
+    polling=true;
     try {
-      if(manual)setBusy(true);
-      const response = await fetch('paynow_status.php?ref=' + encodeURIComponent(payment.reference) + '&token=' + encodeURIComponent(payment.token), {cache: 'no-store',method:manual?'POST':'GET'});
+      const response = await fetch('paynow_status.php?ref=' + encodeURIComponent(payment.reference) + '&token=' + encodeURIComponent(payment.token), {cache: 'no-store',method:'POST'});
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.message || 'Status temporarily unavailable.');
       if(terminal(data))return;
-      status.textContent = 'Reference ' + payment.reference + ': ' + data.status + '. ' + (data.instructions || '')+' '+(data.message || '');
+      waitingMessage(data);
+      document.getElementById('vprProgressTitle').textContent=data.needs_review?'Waiting for Paynow confirmation':'Waiting for payment approval';
       showAuthorization(data);
       if (data.paid && data.certificate_url) {
-        forget(); if (popup && !popup.closed) popup.close();
+        clearTimeout(timer);setWatching(false);forget(); if (popup && !popup.closed) popup.close();
+        status.textContent='Payment verified. Opening your certificate…';
         window.location.href = data.certificate_url; return;
       }
-      clearTimeout(timer); if (++attempts < 60) timer = setTimeout(poll, 10000);
-    } catch (e) { status.textContent = e.message + ' Resume this payment to check again.'; }
-    finally {if(manual)setBusy(false);}
+      schedulePoll();
+    } catch (e) {
+      document.getElementById('vprProgressTitle').textContent='Reconnecting to payment verification';
+      status.textContent='We could not check Paynow just now. Retrying automatically for reference '+payment.reference+'.';schedulePoll();
+    } finally {polling=false;}
   }
   open.addEventListener('click', async function () {
     if (busy) return;
-    if (payment) { if(isMobile(payment.payment_method)){poll(true);return;} window.location.href = returnUrl(payment); return; }
+    if (payment) {setWatching(true);attempts=0;poll();return;}
     if (!form.reportValidity()) return;
     // Open before the first await, while still inside the user's click gesture.
     popup = isMobile(method.value) ? null : window.open('about:blank', 'VPRPaynow', 'popup=yes,width=650,height=780,resizable=yes,scrollbars=yes');
@@ -137,9 +174,8 @@
       showAuthorization(data);
       document.getElementById('vprPayPrice').textContent = label(data.currency) + ' ' + data.amount;
       if(isMobile(data.payment_method)) {
-        document.getElementById('vprOpenPaynowText').textContent='Check payment status';
-        status.textContent='Reference '+data.reference+'. '+(data.instructions || 'Waiting for payment initiation confirmation. Keep this reference.');
-        attempts=0;timer=setTimeout(poll,10000);return;
+        setWatching(true);waitingMessage(data);
+        attempts=0;schedulePoll();return;
       }
       if (!data.browserurl) {
         if (popup && !popup.closed) popup.close();
@@ -147,7 +183,7 @@
       }
       if (popup && !popup.closed) popup.location.replace(data.browserurl);
       else { window.location.href = data.browserurl; return; }
-      document.getElementById('vprOpenPaynowText').textContent = 'Check existing payment';
+      setWatching(true,'Complete payment in the Paynow window');attempts=0;
       poll();
     } catch (e) {
       if (popup && !popup.closed) popup.close();
@@ -156,7 +192,7 @@
   });
   window.addEventListener('message', function (event) {
     if (event.origin === window.location.origin && event.source === popup && event.data && event.data.type === 'VPR_PAYNOW_RETURN') {
-      clearTimeout(timer); poll();
+      clearTimeout(timer);if(watching)poll();
     }
   });
 })();
