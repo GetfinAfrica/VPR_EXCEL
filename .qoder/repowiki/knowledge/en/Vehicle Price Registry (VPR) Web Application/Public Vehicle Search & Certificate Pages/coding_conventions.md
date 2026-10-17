@@ -1,0 +1,4 @@
+- Every script bootstraps with `require_once __DIR__ . '/db.php'` followed by `security_headers()` and `secure_session_start()`, centralising security headers and session handling in the shared library.
+- User-supplied values are rendered through `htmlspecialchars()` (or cast to `(int)`/`(string)`) before output, while SQL queries use prepared statements with bound parameters.
+- Admin-only pages gate access with `admin_session_valid()` and redirect to `admin2000.php` when unauthenticated, keeping admin boundaries explicit at the top of each file.
+- Certificate/report rendering falls back to legacy data shapes (e.g. checking `search_interests` first, then the older `interests` table) so historical records remain printable without migration.

@@ -1,0 +1,1 @@
+PHP with PDO against SQLite; Paynow integration uses HMAC-signed hashes (`paynow_create_hash` / `paynow_validate_hash`) and a separate `pollurl` for asynchronous status checks rather than relying solely on webhooks.

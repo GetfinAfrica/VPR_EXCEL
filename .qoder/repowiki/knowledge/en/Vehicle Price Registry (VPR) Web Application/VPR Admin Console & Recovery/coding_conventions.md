@@ -1,0 +1,5 @@
+- Each entry script begins with `require_once __DIR__ . '/db.php'` followed by `security_headers()` and `secure_session_start()` before any output.
+- User-supplied values are rendered through `htmlspecialchars()` and form submissions validate CSRF via `verify_csrf($_POST['csrf_token'])` before processing.
+- Every state-changing admin action is recorded with `audit_admin($event, $detail)` so login, pricing updates, interest changes, recovery, and password resets are all auditable.
+- Session-based admin authorization is checked with `admin_session_valid()` and failed attempts fall back to the login form rather than throwing exceptions.
+- Error and success messages are stored in `$error` / `$message` variables and echoed conditionally inside the HTML template instead of using redirects or flash sessions.

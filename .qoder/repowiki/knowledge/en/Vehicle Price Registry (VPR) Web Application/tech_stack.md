@@ -1,0 +1,1 @@
+PHP with PDO against SQLite (data/vpr.sqlite); Paynow and ZiG payment gateways; Excel-based backup/migration utilities.

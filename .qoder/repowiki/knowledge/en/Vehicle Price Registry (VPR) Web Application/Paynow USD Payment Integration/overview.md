@@ -1,0 +1,1 @@
+Four self-contained PHP entry points that create, poll, and confirm Paynow USD payments for VPR vehicle-interest searches, persisting state in the shared payments table.

@@ -1,0 +1,1 @@
+Flat PHP application that lets users search vehicle prices, pay via Paynow or ZiG, and manage pricing/traffic data through a password-protected admin console backed by SQLite.

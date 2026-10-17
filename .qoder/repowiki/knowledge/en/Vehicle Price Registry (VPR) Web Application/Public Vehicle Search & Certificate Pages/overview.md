@@ -1,0 +1,1 @@
+Public-facing PHP entry points for vehicle interest searches, a domain-readiness diagnostic page, and the generated search-report certificate.

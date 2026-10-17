@@ -1,0 +1,6 @@
+- Each script begins with `require_once __DIR__ . '/db.php'` and calls `security_headers()` before any output, treating `db.php` as the single shared bootstrap.
+- User input is normalised through helper functions (`clean`, `normalise_reg`, `normalise_chassis`, `valid_registration`) before being passed to SQL or the gateway.
+- Sensitive comparisons use constant-time `hash_equals` (reference tokens, Paynow references) instead of `==` to prevent timing attacks.
+- Gateway responses are parsed through `paynow_get` / `paynow_parse_response` and validated via `paynow_validate_hash` before trusting any field.
+- Payment state transitions go through the `payments` table with explicit statuses (`Created`, `Initiated`, `AmountMismatch`, etc.) and timestamps updated via `CURRENT_TIMESTAMP`.
+- Errors are caught as `Throwable` and recorded into `payments.last_error` (truncated to 1000 chars) so failures are auditable without leaking stack traces to callers.

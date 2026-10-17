@@ -1,0 +1,1 @@
+Admin access requires the server-side admin password set via `set_admin_password`; recovery is initiated through `recover_admin.php?mode=request`, which emails a one-time reset link valid for 15 minutes. The payment repair page must be accessed as an authenticated admin session.

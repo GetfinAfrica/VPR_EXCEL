@@ -1,0 +1,4 @@
+- Each public-facing feature is implemented as a standalone PHP entry script at the repository root rather than inside a framework router.
+- Cross-cutting functionality (DB connection, schema migrations, security helpers, admin auth, payment integrations, search finalization) is centralized in db.php and included by entry scripts instead of being duplicated.
+- Secret configuration values are referenced by key name from config.php and never hard-coded into source files.
+- Feature releases are documented incrementally under Documentation/README_V*.txt rather than tracked via separate branches.

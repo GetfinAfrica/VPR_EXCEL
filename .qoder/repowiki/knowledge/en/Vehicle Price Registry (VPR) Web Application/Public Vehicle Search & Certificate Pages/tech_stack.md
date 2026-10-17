@@ -1,0 +1,1 @@
+Plain PHP with PDO against SQLite; CSS custom properties for the VPR navy/gold palette; inline `@page`/`@media print` styles for A4 certificate printing; Paynow integration via browser popups and a polling endpoint rather than server-side webhooks.

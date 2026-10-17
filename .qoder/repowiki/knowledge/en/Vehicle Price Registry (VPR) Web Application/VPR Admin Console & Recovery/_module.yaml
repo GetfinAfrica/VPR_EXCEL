@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: admin_console
+title: VPR Admin Console & Recovery
+scope:
+    - admin2000.php
+    - recover_admin.php
+    - repair_payment_db.php
+source_files: []
+depends_on: []
+related_to:
+    - path: paynow_usd_payments

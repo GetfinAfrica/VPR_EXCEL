@@ -1,0 +1,13 @@
+schema_version: 1
+module_path: paynow_usd_payments
+title: Paynow USD Payment Integration
+scope:
+    - paynow_create.php
+    - paynow_result.php
+    - paynow_return.php
+    - paynow_status.php
+source_files: []
+depends_on: []
+related_to:
+    - path: admin_console
+    - path: public_search_and_certificate

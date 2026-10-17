@@ -1,0 +1,77 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: main
+nodes_managed: true
+exported_at: "2026-10-17T11:26:03Z"
+modules:
+    "":
+        dir_name: Vehicle Price Registry (VPR) Web Application
+        title: Vehicle Price Registry (VPR) Web Application
+        scope:
+            - Documentation/
+            - data/
+            - .gitattributes
+            - .gitignore
+            - .htaccess
+            - Checksum
+            - Downloading
+            - Extracting
+            - Fetching
+            - Installing
+            - Latest
+            - Verifying
+            - corrections.php
+            - data_exchange.php
+            - db.php
+            - install.cmd
+            - privacy.php
+            - search_process.php
+            - terms.php
+            - traffic_report.php
+            - zig_api_charge.php
+        source_files: []
+        children:
+            - admin_console
+            - paynow_usd_payments
+            - public_search_and_certificate
+        depends_on: []
+        related_to: []
+    admin_console:
+        dir_name: VPR Admin Console & Recovery
+        title: VPR Admin Console & Recovery
+        scope:
+            - admin2000.php
+            - recover_admin.php
+            - repair_payment_db.php
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: paynow_usd_payments
+    paynow_usd_payments:
+        dir_name: Paynow USD Payment Integration
+        title: Paynow USD Payment Integration
+        scope:
+            - paynow_create.php
+            - paynow_result.php
+            - paynow_return.php
+            - paynow_status.php
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: admin_console
+            - path: public_search_and_certificate
+    public_search_and_certificate:
+        dir_name: Public Vehicle Search & Certificate Pages
+        title: Public Vehicle Search & Certificate Pages
+        scope:
+            - index.php
+            - domain_check.php
+            - certificate.php
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: paynow_usd_payments

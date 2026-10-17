@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: public_search_and_certificate
+title: Public Vehicle Search & Certificate Pages
+scope:
+    - index.php
+    - domain_check.php
+    - certificate.php
+source_files: []
+depends_on: []
+related_to:
+    - path: paynow_usd_payments

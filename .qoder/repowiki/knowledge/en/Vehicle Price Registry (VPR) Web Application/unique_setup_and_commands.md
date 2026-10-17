@@ -1,0 +1,1 @@
+Initial installation runs install.cmd, which bootstraps the SQLite database and required tables before any entry script can operate.

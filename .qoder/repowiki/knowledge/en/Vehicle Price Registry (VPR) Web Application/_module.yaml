@@ -1,0 +1,28 @@
+schema_version: 1
+module_path: ""
+title: Vehicle Price Registry (VPR) Web Application
+scope:
+    - Documentation/
+    - data/
+    - .gitattributes
+    - .gitignore
+    - .htaccess
+    - Checksum
+    - Downloading
+    - Extracting
+    - Fetching
+    - Installing
+    - Latest
+    - Verifying
+    - corrections.php
+    - data_exchange.php
+    - db.php
+    - install.cmd
+    - privacy.php
+    - search_process.php
+    - terms.php
+    - traffic_report.php
+    - zig_api_charge.php
+source_files: []
+depends_on: []
+related_to: []

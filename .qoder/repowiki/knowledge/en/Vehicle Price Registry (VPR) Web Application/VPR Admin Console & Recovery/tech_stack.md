@@ -1,0 +1,1 @@
+Plain PHP with PDO SQLite, inline CSS/HTML templates, and email-based admin recovery tokens; relies on `config.php` constants `VPR_MAX_LOGIN_ATTEMPTS`, `VPR_LOGIN_BLOCK_SECONDS`, `VPR_VERSION`, `VPR_PAYNOW_INTEGRATION_ID`, and `VPR_SEARCH_CURRENCY`.
