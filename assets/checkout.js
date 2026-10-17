@@ -16,14 +16,25 @@
   let stage=1;
   const vehicleStage=document.getElementById('vehicleStage');
   const paymentStage=document.getElementById('paymentStage');
+  const vehicleTab=document.getElementById('vehicleTab'),paymentTab=document.getElementById('paymentTab');
   function showStage(next) {
     stage=next;vehicleStage.hidden=next!==1;paymentStage.hidden=next!==2;paymentStage.disabled=next!==2;
+    vehicleTab.setAttribute('aria-selected',String(next===1));paymentTab.setAttribute('aria-selected',String(next===2));
+    vehicleTab.tabIndex=next===1?0:-1;paymentTab.tabIndex=next===2?0:-1;
     document.getElementById('stageTitle').textContent=next===1?'Vehicle details':'Payment details';
     document.getElementById('stageProgress').textContent=next===1?'Step 1 of 2 — Vehicle':'Step 2 of 2 — Payment';
+    document.getElementById('stageIntro').textContent=next===1?'Enter your vehicle details to begin the check.':'Choose the currency and payment method for your vehicle check.';
   }
-  function goToPayment(){if(form.reportValidity()){showStage(2);updateDetails();}}
+  function goToPayment(){if(stage===2)return;if(form.reportValidity()){showStage(2);updateDetails();paymentTab.focus();}}
+  vehicleTab.addEventListener('click',()=>{if(!busy)showStage(1);});
+  paymentTab.addEventListener('click',()=>{if(!busy)goToPayment();});
+  for(const tab of [vehicleTab,paymentTab])tab.addEventListener('keydown',function(event){
+    if(busy||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+    event.preventDefault();const next=event.key==='Home'?1:(event.key==='End'?2:(stage===1?2:1));
+    if(next===1){showStage(1);vehicleTab.focus();}else goToPayment();
+  });
   document.getElementById('vprContinue').addEventListener('click',goToPayment);
-  document.getElementById('vprBack').addEventListener('click',()=>showStage(1));
+  document.getElementById('vprBack').addEventListener('click',()=>{showStage(1);vehicleTab.focus();});
   document.getElementById('test_scenario').addEventListener('change',function(){
     const value=this.value;
     if(testMode()&&['ecocash','onemoney'].includes(method.value)&&['0771111111','0772222222','0773333333','0774444444'].includes(value))document.getElementById('payer_phone').value=value;
@@ -49,7 +60,7 @@
     document.getElementById('methodHint').textContent=isMobile(method.value)?'Approve the request on your phone. Never enter your wallet PIN here.':'Enter card details only on Paynow. Never enter a PIN or card number here.';
   }
   method.addEventListener('change',updateDetails); currency.addEventListener('change',updateDetails);
-  let payment = null, popup = null, busy = false, timer = null, attempts = 0, watching = false, polling = false;
+  let payment = null, popup = null, busy = false, timer = null, watching = false, polling = false, completed = false;
   const storageKey = 'vpr.pendingCheckout';
   const requestStorageKey = 'vpr.checkoutRequest';
   let savedRequest = null;
@@ -59,8 +70,22 @@
   function returnUrl(p) {
     return 'paynow_return.php?ref=' + encodeURIComponent(p.reference) + '&token=' + encodeURIComponent(p.token);
   }
+  function acknowledgementUrl(p){
+    return 'payment_success.php?ref='+encodeURIComponent(p.reference)+'&token='+encodeURIComponent(p.token);
+  }
+  function showCompleted(data){
+    payment={...payment,...data};completed=true;store(payment);clearTimeout(timer);setWatching(false);
+    document.getElementById('vprPayTitle').textContent='Payment confirmed';
+    document.getElementById('vprPayOutcome').hidden=false;
+    document.getElementById('innbucksOpen').hidden=true;
+    document.getElementById('vprPayCopy').textContent='Your payment is verified. Select Complete to receive your VPR acknowledgement.';
+    document.getElementById('vprOpenPaynowText').textContent='Complete';
+    trigger.textContent='Complete payment';
+    status.textContent='Reference '+payment.reference+'. Payment successful. Your certificate is ready after acknowledgement.';
+  }
   function setBusy(on) {
     busy = on; open.disabled = on; trigger.disabled = on; close.disabled = on;
+    vehicleTab.disabled=on;paymentTab.disabled=on;
     document.getElementById('vprSpinner').style.display = on || watching ? 'block' : 'none';
     open.hidden=watching;
   }
@@ -76,11 +101,7 @@
   function schedulePoll(){
     clearTimeout(timer);
     if(!watching||!payment)return;
-    if(++attempts>=60){
-      setWatching(false);document.getElementById('vprOpenPaynowText').textContent='Resume automatic checks';
-      status.textContent='Payment has not been confirmed yet. Keep reference '+payment.reference+'. You can resume automatic checks for this same payment.';return;
-    }
-    timer=setTimeout(poll,10000);
+    timer=setTimeout(poll,2000);
   }
   try {
     const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
@@ -95,7 +116,7 @@
     }
   } catch (_) {}
   updateDetails();
-  showStage(payment||savedRequest?2:1);
+  showStage(1);
   if (payment || savedRequest) {
     const recovery = document.createElement('p');
     const resume = document.createElement('a'); resume.href = payment ? returnUrl(payment) : '#vprSearchForm';
@@ -109,12 +130,15 @@
     if(stage===1){goToPayment();return;}
     if (payment) {
       modal.style.display='flex';document.getElementById('vprPayPrice').textContent=label(payment.currency||currency.value)+' '+(payment.amount||'');
-      setWatching(true);waitingMessage(payment);attempts=0;poll();return;
+      if(completed){showCompleted(payment);return;}
+      setWatching(true);waitingMessage(payment);poll();return;
     }
     if (!form.reportValidity()) return;
     const amount = form.dataset[currency.value === 'ZWG' ? 'zwgPrice' : 'usdPrice'];
     if (amount === '0.00') { form.submit(); return; }
     modal.style.display = 'flex';
+    document.getElementById('vprPayTitle').textContent='Complete vehicle check';
+    document.getElementById('vprPayOutcome').hidden=true;
     document.getElementById('vprPayPrice').textContent = label(currency.value) + ' ' + amount;
     document.getElementById('vprOpenPaynowText').textContent = isMobile(method.value) ? 'Request '+label(currency.value)+' '+amount+' via '+method.options[method.selectedIndex].text : 'Pay '+label(currency.value)+' '+amount+' with '+(method.value==='card'?'Visa / Mastercard':'Paynow');
     document.getElementById('vprPayCopy').textContent = 'Your certificate is released only after VPR verifies payment.';
@@ -125,11 +149,12 @@
   function terminal(data){
     if(!['Cancelled','Failed','Expired'].includes(data.status))return false;
     status.textContent=data.message||data.instructions||('Payment '+data.status.toLowerCase()+'. No certificate issued.');
-    clearTimeout(timer);setWatching(false);forget();payment=null;
+    clearTimeout(timer);setWatching(false);forget();payment=null;completed=false;
+    document.getElementById('vprPayOutcome').hidden=true;
     document.getElementById('innbucksOpen').hidden=true;
     form.elements.namedItem('checkout_key').value=window.crypto.randomUUID().replace(/-/g,'');
     document.getElementById('vprOpenPaynowText').textContent='Try another payment';
-    if(popup&&!popup.closed)popup.close();return true;
+    return true;
   }
   async function poll() {
     if (!payment || polling || !watching) return;
@@ -143,9 +168,7 @@
       document.getElementById('vprProgressTitle').textContent=data.needs_review?'Waiting for Paynow confirmation':'Waiting for payment approval';
       showAuthorization(data);
       if (data.paid && data.certificate_url) {
-        clearTimeout(timer);setWatching(false);forget(); if (popup && !popup.closed) popup.close();
-        status.textContent='Payment verified. Opening your certificate…';
-        window.location.href = data.certificate_url; return;
+        showCompleted(data);return;
       }
       schedulePoll();
     } catch (e) {
@@ -155,7 +178,10 @@
   }
   open.addEventListener('click', async function () {
     if (busy) return;
-    if (payment) {setWatching(true);attempts=0;poll();return;}
+    if (payment) {
+      if(completed){forget();window.location.href=acknowledgementUrl(payment);return;}
+      setWatching(true);poll();return;
+    }
     if (!form.reportValidity()) return;
     // Open before the first await, while still inside the user's click gesture.
     popup = isMobile(method.value) ? null : window.open('about:blank', 'VPRPaynow', 'popup=yes,width=650,height=780,resizable=yes,scrollbars=yes');
@@ -173,9 +199,10 @@
       if(terminal(data))return;
       showAuthorization(data);
       document.getElementById('vprPayPrice').textContent = label(data.currency) + ' ' + data.amount;
+      if(data.status==='Paid'){setWatching(true,'Confirming payment');poll();return;}
       if(isMobile(data.payment_method)) {
         setWatching(true);waitingMessage(data);
-        attempts=0;schedulePoll();return;
+        schedulePoll();return;
       }
       if (!data.browserurl) {
         if (popup && !popup.closed) popup.close();
@@ -183,7 +210,7 @@
       }
       if (popup && !popup.closed) popup.location.replace(data.browserurl);
       else { window.location.href = data.browserurl; return; }
-      setWatching(true,'Complete payment in the Paynow window');attempts=0;
+      setWatching(true,'Complete payment in the Paynow window');
       poll();
     } catch (e) {
       if (popup && !popup.closed) popup.close();

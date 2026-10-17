@@ -1,0 +1,23 @@
+# UI enhancements
+
+Branch: `ui/enhancements`.
+
+Active checkout and payment-return pages request reconciliation every two seconds while awaiting payment. The shared database claim prevents overlapping Paynow calls, and a two-second server limit applies across tabs for each transaction. Successful, cancelled, failed and expired transactions stop automatic polling. Network failures retry the same reference; no retry initiates another charge. Closing the checkout modal pauses its checks; reopening resumes its existing payment.
+
+After verified success, the screen remains open and displays **Complete**. Selecting it opens `payment_success.php`, where VPR acknowledges the amount, currency, payment method, vehicle registration and transaction references. The user then selects **View certificate**. Neither the modal nor the Paynow return window automatically closes or opens a certificate after success. Refreshing an acknowledgement does not issue another certificate.
+
+The acknowledgement requires the transaction's private return token, Paid status, a verification timestamp and an issued certificate. Invalid access returns 403; unverified or non-successful payments return 409 without a certificate link. Amounts and references come from the database, not browser parameters.
+
+Shared `ui.php` and `assets/ui.css` place proportionate logos on the left beside clear headings across public search, payment modal/status/acknowledgement, certificate, admin login/dashboard/recovery, policy pages and maintenance screens. Related actions share a responsive row and wrap only when necessary on narrow screens. A single visible action aligns right at approximately a quarter of the content width, with a readable minimum width. Certificate print controls and navigation remain outside the printed report.
+
+Vehicle and Payment use accessible tabs. Vehicle is always active on entry, including when a saved checkout exists. Payment validates the vehicle fields before opening; switching tabs preserves the entered values. Arrow keys and Home/End support keyboard navigation. Registration/chassis share the first two-column row, followed by brand/model. Payer name/email and method/phone use the same padded two-column layout, stacking on narrow phone screens.
+
+Breadcrumbs connect public and administration pages to Home and their parent views. Paid certificates include a breadcrumb back to their matching payment acknowledgement. View certificate links in acknowledgements and admin history open a new tab with `rel="noopener"`; the acknowledgement stays available in the original tab.
+
+Follow-up layout validation: 32 HTTP and 31 browser-flow checks passed. In the running browser, Payment correctly blocked blank vehicle fields; switching between tabs preserved the entered values; the initial page and reload selected Vehicle. The two-column layout, left-hand logos and right-aligned quarter-width Continue action were visually checked. Clicking View certificate opened a separate tab while retaining the acknowledgement, and the certificate displayed the matching acknowledgement breadcrumb. Existing paid test data was reused; no additional payment initiation was needed for these layout checks.
+
+Paynow documents polling its returned poll URL using an empty POST and recommends status callbacks as the normal production mechanism: https://developers.paynow.co.zw/docs/paynow/polling_status/. This branch implements the requested two-second active-checkout polling, including localhost where provider callbacks cannot reach the application. Existing callback validation and the unattended CLI reconciler remain available.
+
+Validation: 298 checks passed (95 payment, 32 HTTP, 110 express, 30 scenario, 31 browser-flow). HTTP coverage includes both currencies' pending/paid acknowledgements and invalid-token access. Browser-flow coverage verifies two-second scheduling, no automatic success navigation/window closing for mobile and hosted checkout, explicit Complete navigation, continued pending checks and no duplicate initiation.
+
+Actual Paynow test on 17 October 2026: USD EcoCash for UIX1234 was polled at 16:47:33, :36, :38, :41, :43, :46, :48 and :50 Harare time (two-second waits plus request time). The final signed response was Paid. The modal remained open with Complete; selecting Complete opened VPR's acknowledgement for USD 1.00, and View certificate opened the matching UIX1234 certificate. The paid return page likewise remained on Payment confirmed until Complete. Screens and certificate header were visually checked; the certificate toolbar sits above the report and is hidden in print. No real funds or real card authorisations were used.

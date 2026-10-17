@@ -96,10 +96,10 @@ table{background:#fff}th{background:#eef3f7!important;color:var(--vpr-navy)!impo
 @media(max-width:700px){.vpr-price-grid{grid-template-columns:1fr}.wrap{padding:12px!important}}
 
 </style>
-</head><body>
-<div class="box"><img class="logo" src="assets/vpr-logo.png" alt="VPR"><h2>Administration</h2><p>Private VPR administration access.</p>
+<?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head><body>
+<div class="box"><?php vpr_page_heading('Administration','Private VPR administration access'); ?>
 <?php if($error): ?><p class="err"><?=htmlspecialchars($error)?></p><?php endif;?>
-<form method="post"><input type="password" name="password" placeholder="Admin password" required><button>Login</button></form>
+<form method="post"><input type="password" name="password" placeholder="Admin password" required><div class="vpr-actions"><button>Login</button><a class="vpr-secondary" href="index.php">Vehicle check</a></div></form>
 <p style="text-align:center;margin-top:16px"><a href="recover_admin.php">Forgot / blocked admin password?</a></p>
 </div></body></html>
 <?php exit;
@@ -250,8 +250,8 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VPR Admin</title>
 <style>
 :root{--navy:#062c52;--gold:#b88a26}body{font-family:Arial;background:#f5f7f9;color:#14202b;margin:0}.wrap{max-width:1120px;margin:auto;padding:28px 18px}.logo{max-width:360px;width:100%}.top{display:flex;justify-content:space-between;align-items:center}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.card,.panel{background:#fff;border:1px solid #dfe5ea;border-radius:12px;padding:18px}.num{font-size:28px;font-weight:800;color:var(--navy)}.muted{color:#6b7280;font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{margin-top:16px}input,textarea,select,button{width:100%;padding:10px;margin-top:8px;box-sizing:border-box}button{background:var(--navy);color:#fff;border:0;border-radius:8px;font-weight:700}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid #eee}.ok{color:#166534}.err{color:#b91c1c}.smallbtn{width:auto;padding:8px 10px;background:#991b1b}.viewbtn{display:inline-block;background:var(--navy);color:#fff;text-decoration:none;padding:8px 10px;border-radius:7px;font-size:12px;font-weight:700;white-space:nowrap}.historyform{display:flex;gap:8px;align-items:end}.historyform>div{flex:1}.historyform button{width:auto;min-width:130px}.historysummary{margin:10px 0 0;color:#58636d;font-size:13px}.certref{font-family:monospace;font-size:12px;color:#334155}.result-ok{color:#166534;font-weight:700}.result-warn{color:#991b1b;font-weight:700}.rank{font-weight:800;color:var(--gold)}.footer{text-align:center;margin-top:20px;font-size:12px}.footer a{color:var(--navy);font-weight:700;text-decoration:none}@media(max-width:800px){.cards,.grid{grid-template-columns:1fr}.top{flex-direction:column;align-items:flex-start;gap:10px}.historyform{flex-direction:column;align-items:stretch}.historyform button{width:100%}}
-</style></head><body><div class="wrap">
-<div class="top"><div><img class="logo" src="assets/vpr-logo.png" alt="VPR"><div class="muted">Private administration</div></div><a href="?logout=1">Logout</a></div>
+</style><?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head><body><div class="wrap">
+<?php vpr_page_heading('Administration','Private vehicle registry management'); ?><div class="vpr-actions vpr-toolbar"><a href="index.php">Vehicle check</a><a class="vpr-secondary" href="?logout=1">Logout</a></div>
 <?php if($message): ?><p class="ok"><?=htmlspecialchars($message)?></p><?php endif;?>
 <?php if($error): ?><p class="err"><?=htmlspecialchars($error)?></p><?php endif;?>
 <div class="cards" style="grid-template-columns:repeat(3,1fr)">
@@ -289,11 +289,11 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
         <div class="vpr-price-note"><strong>0.00 = FREE.</strong> VPR bypasses Paynow and immediately issues the search certificate.</div>
       </div>
     </div>
-    <button type="submit">Save & Publish Search Prices</button>
+    <div class="vpr-actions"><button type="submit">Save & Publish Search Prices</button></div>
   </form>
 </div>
 
-<div class="panel"><h2>Add Vehicle Interest</h2><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="action" value="add_interest"><label>Registration Number</label><input name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="AAA1111"><label>Vehicle Brand</label><select name="vehicle_brand" required><option value="">Select vehicle brand</option><?php foreach($brands as $b): ?><option value="<?=htmlspecialchars($b)?>"><?=htmlspecialchars($b)?></option><?php endforeach;?></select><label>Vehicle Model</label><input name="vehicle_model" required placeholder="e.g. NV350"><label>Chassis Number (optional)</label><input name="chassis_number"><label>Interested Party</label><input name="interested_party" required placeholder="Bank, lender or secured party"><label>Reference / Note</label><textarea name="reference_note" rows="3"></textarea><button>Add Interest</button></form></div>
+<div class="panel"><h2>Add Vehicle Interest</h2><form method="post"><input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="hidden" name="action" value="add_interest"><label>Registration Number</label><input name="registration_number" required maxlength="7" pattern="[A-Za-z]{3}[0-9]{4}" title="Exactly 3 letters followed by 4 numbers, e.g. AAA1111" placeholder="AAA1111"><label>Vehicle Brand</label><select name="vehicle_brand" required><option value="">Select vehicle brand</option><?php foreach($brands as $b): ?><option value="<?=htmlspecialchars($b)?>"><?=htmlspecialchars($b)?></option><?php endforeach;?></select><label>Vehicle Model</label><input name="vehicle_model" required placeholder="e.g. NV350"><label>Chassis Number (optional)</label><input name="chassis_number"><label>Interested Party</label><input name="interested_party" required placeholder="Bank, lender or secured party"><label>Reference / Note</label><textarea name="reference_note" rows="3"></textarea><div class="vpr-actions"><button>Add Interest</button></div></form></div>
 <div class="panel"><h2>Searches per day</h2><table><tr><th>Date</th><th>Searches</th></tr><?php foreach($daily as $d): ?><tr><td><?=htmlspecialchars($d['day'])?></td><td><?=intval($d['searches'])?></td></tr><?php endforeach;?><?php if(!$daily): ?><tr><td colspan="2">No searches yet.</td></tr><?php endif;?></table></div>
 </div>
 
@@ -315,7 +315,7 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
 <label>Period</label>
 <input name="stats_period" id="stats_period" value="<?=htmlspecialchars($statsPeriod)?>" required>
 </div>
-<button type="submit">Show Statistics</button>
+<div class="vpr-actions"><button type="submit">Show Statistics</button></div>
 </form>
 
 <div class="card" style="margin-top:14px;background:#f8fafc">
@@ -324,7 +324,7 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
 <div class="muted">Searches in selected period</div>
 </div>
 
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+<div class="vpr-actions">
 <a class="viewbtn" href="traffic_report.php?format=xlsx&amp;stats_class=<?=urlencode($statsClass)?>&amp;stats_period=<?=urlencode($statsPeriod)?>">Download Excel Report</a>
 <a class="viewbtn" href="traffic_report.php?format=pdf&amp;stats_class=<?=urlencode($statsClass)?>&amp;stats_period=<?=urlencode($statsPeriod)?>">Download PDF Report</a>
 </div>
@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <p class="muted">Imports and merges a VPR Excel backup. Existing matching records are preserved or updated rather than blindly duplicated.</p>
       <form method="post" action="data_exchange.php?action=import" enctype="multipart/form-data" onsubmit="return confirm('Import this VPR Excel backup? Please make sure you have a current backup first.');">
         <input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>"><input type="file" name="backup_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-        <button type="submit">Upload & Merge Excel Backup</button>
+        <div class="vpr-actions"><button type="submit">Upload & Merge Excel Backup</button></div>
       </form>
     </div>
   </div>
@@ -415,7 +415,7 @@ document.addEventListener('DOMContentLoaded',function(){
             <?=htmlspecialchars($h['result'])?>
           </td>
           <td class="certref"><?=htmlspecialchars(certificate_number_for_row($h))?></td>
-          <td><a class="viewbtn" href="certificate.php?id=<?=intval($h['id'])?>" target="_blank">View Certificate</a></td>
+          <td><a class="viewbtn" href="certificate.php?id=<?=intval($h['id'])?>" target="_blank" rel="noopener" aria-label="View certificate (opens in a new tab)">View Certificate ↗</a></td>
         </tr>
         <?php endforeach;?>
         <?php if(!$historyRows): ?><tr><td colspan="5">No search history found for this registration number.</td></tr><?php endif;?>

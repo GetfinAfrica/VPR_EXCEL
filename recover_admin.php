@@ -62,9 +62,8 @@ input,button{width:100%;padding:12px;margin-top:12px;box-sizing:border-box}
 button{background:#062c52;color:#fff;border:0;border-radius:8px;font-weight:700}
 .ok{color:#166534}.err{color:#b91c1c}.muted{color:#66727e;font-size:13px;line-height:1.5}
 a{color:#062c52}
-</style></head><body><div class="box">
-<img class="logo" src="assets/vpr-logo.png" alt="VPR">
-<h2>Admin Recovery</h2>
+</style><?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head><body><div class="box">
+<?php vpr_page_heading('Admin recovery','Restore access to VPR administration'); ?>
 
 <?php if($message): ?><p class="ok"><?=htmlspecialchars($message)?></p><?php endif;?>
 <?php if($error): ?><p class="err"><?=htmlspecialchars($error)?></p><?php endif;?>
@@ -73,7 +72,7 @@ a{color:#062c52}
 <p class="muted">Use this only if you have forgotten the admin password or the login has been blocked. VPR will send a one-time recovery link to the configured security email address.</p>
 <form method="post">
   <input type="hidden" name="request_recovery" value="1">
-  <button type="submit">Send Recovery Link</button>
+  <div class="vpr-actions"><button type="submit">Send Recovery Link</button><a class="vpr-secondary" href="admin2000.php">Return to login</a></div>
 </form>
 <?php elseif($mode === 'reset' && !$error): ?>
 <form method="post">
@@ -82,9 +81,9 @@ a{color:#062c52}
   <input type="password" name="new_password" minlength="12" required>
   <label>Confirm new password</label>
   <input type="password" name="confirm_password" minlength="12" required>
-  <button type="submit">Change Admin Password</button>
+  <div class="vpr-actions"><button type="submit">Change Admin Password</button><a class="vpr-secondary" href="admin2000.php">Return to login</a></div>
 </form>
 <?php endif; ?>
 
-<p style="margin-top:18px"><a href="admin2000.php">Return to Admin Login</a></p>
+<?php if($error || $message): ?><div class="vpr-actions"><a href="admin2000.php">Return to Admin Login</a></div><?php endif; ?>
 </div></body></html>

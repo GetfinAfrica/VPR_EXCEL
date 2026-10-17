@@ -374,7 +374,11 @@ $pdo->beginTransaction();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         http_response_code(400);
-        echo '<!doctype html><html><body style="font-family:Arial;padding:30px"><h2>VPR Import Failed</h2><p>'.htmlspecialchars($e->getMessage()).'</p><p><a href="admin2000.php">Return to Admin</a></p></body></html>';
+        require_once __DIR__.'/ui.php';
+        echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VPR Import Failed</title>';
+        vpr_ui_assets();echo '</head><body class="vpr-payment-page"><main class="vpr-payment-box">';
+        vpr_page_heading('Import failed','VPR data backup and migration');
+        echo '<p>'.htmlspecialchars($e->getMessage()).'</p><div class="vpr-actions"><a href="admin2000.php">Return to Admin</a><a class="vpr-secondary" href="index.php">Vehicle check</a></div></main></body></html>';
         exit;
     }
 }

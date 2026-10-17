@@ -12,7 +12,7 @@ try {
     }
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Authenticated browser reconciliation (automatic or manual). The provider
-        // poll has a shared ten-second rate limit and never initiates another charge.
+        // poll has a shared two-second rate limit and never initiates another charge.
         try { vpr_poll_payment($pdo, $ref); } catch (Throwable $ignored) {}
         $payment = vpr_payment($pdo, $ref);
     }
