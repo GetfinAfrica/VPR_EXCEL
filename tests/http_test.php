@@ -39,6 +39,8 @@ try{
             $d['hash']=paynow_create_hash($d,vpr_paynow_profile($ccy)['key']);return http_build_query($d);
         };
         $p=vpr_start_checkout($pdo,$ccy,vpr_vehicle_request($input),$requestKey,$mock,null,vpr_checkout_details($input));
+        $ack='?ref='.urlencode($p['merchant_reference']).'&token='.urlencode($p['return_token']);
+        [$code,$pendingAck]=request('/payment_success.php'.$ack);expect_http($code===409&&strpos($pendingAck,'id="viewCertificate"')===false,$ccy.' pending acknowledgement cannot claim success or expose certificate');
         [$code,$body]=request('/paynow_create.php',$input);$result=json_decode($body,true);
         expect_http($code===200&&($result['reference']??'')===$p['merchant_reference'],$ccy.' HTTP retry resumes existing checkout');
         expect_http(strpos($body,'fixture-'.$ccy.'-key')===false&&strpos($body,'integration_key')===false,'checkout JSON never exposes integration key');
@@ -50,6 +52,8 @@ try{
         $q='?ref='.urlencode($p['merchant_reference']).'&token='.urlencode($p['return_token']);
         [$code,$body]=request('/paynow_status.php'.$q);$result=json_decode($body,true);
         expect_http($code===200&&($result['paid']??false)&&!empty($result['certificate_url']),$ccy.' verified status releases certificate URL');
+        [$code,$ackBody]=request('/payment_success.php'.$ack);expect_http($code===200&&strpos($ackBody,'VPR acknowledges your successful payment')!==false&&strpos($ackBody,'id="viewCertificate"')!==false&&strpos($ackBody,$ccy.' '.($ccy==='USD'?'1.00':'2.00'))!==false,$ccy.' verified acknowledgement shows correct amount and explicit certificate link');
+        [$code]=request('/payment_success.php?ref='.$p['merchant_reference'].'&token=wrong');expect_http($code===403,'acknowledgement rejects wrong access token');
         [$code,$cert]=request('/'.$result['certificate_url']);expect_http($code===200&&strpos($cert,'TST1234')!==false,$ccy.' authorized certificate renders');
         $id=vpr_payment($pdo,$p['merchant_reference'])['search_id'];
         [$code]=request('/certificate.php?id='.$id.'&token=wrong');expect_http($code===403,'certificate rejects wrong access token');

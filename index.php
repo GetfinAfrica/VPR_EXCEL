@@ -46,18 +46,17 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 @keyframes vprspin{to{transform:rotate(360deg)}} .payclose{background:#e8edf2;color:var(--ink);margin-top:12px}
 
 </style>
-</head>
+<?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head>
 <body>
 <div class="wrap">
+  <?php vpr_page_heading('Vehicle check','Vehicle Pledge Registry'); ?>
   <div class="brand">
-    <img class="logoimg" src="assets/vpr-logo.png" alt="VPR — Vehicle Pledge Registry">
-    <div class="sub">Public vehicle interest verification</div>
     <div style="display:inline-block;margin-top:8px;padding:5px 9px;border-radius:999px;background:#e9f5ef;color:#1f6b47;font-size:11px;font-weight:700"><?=request_is_https() ? '🔒 HTTPS Secure Connection' : 'Local development connection'?></div>
   </div>
 
   <div class="card">
-    <h1 id="stageTitle">Vehicle details</h1><p id="stageProgress" aria-live="polite">Step 1 of 2 — Vehicle</p>
-    <p>Enter the vehicle details below. Registration number is the unique VPR reference and is required for every search.</p>
+    <h2 id="stageTitle" style="color:#062c52;margin:0">Vehicle details</h2><p id="stageProgress" aria-live="polite">Step 1 of 2 — Vehicle</p>
+    <p id="stageIntro">Enter the vehicle details below. Registration number is the unique VPR reference and is required for every search.</p>
 <form method="post" action="search_process.php" autocomplete="off" id="vprSearchForm" data-usd-mode="<?=htmlspecialchars(vpr_paynow_profile('USD',false)['environment'])?>" data-zwg-mode="<?=htmlspecialchars(vpr_paynow_profile('ZWG',false)['environment'])?>" data-usd-price="<?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?>" data-zwg-price="<?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>">
 <input type="hidden" name="csrf_token" value="<?=htmlspecialchars(csrf_token())?>">
 <input type="hidden" name="checkout_key" value="<?=bin2hex(random_bytes(16))?>">
@@ -163,8 +162,8 @@ button,.btn{display:inline-block;width:100%;margin-top:20px;padding:14px 16px;bo
 <input type="tel" id="payer_phone" name="payer_phone" maxlength="20" autocomplete="tel" placeholder="Enter mobile number">
 <p class="hint" id="methodHint">Enter card details only on Paynow. Never enter a PIN or card number here.</p>
 </fieldset>
-<button type="button" id="vprBack" class="payclose">Back to vehicle</button>
-<button type="button" id="vprPayButton">Review payment</button><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
+<div class="vpr-actions"><button type="button" id="vprBack" class="payclose">Back to vehicle</button>
+<button type="button" id="vprPayButton">Review payment</button></div><div class="hint" style="text-align:center;margin-top:7px" id="priceHint">Current search fees are set by VPR administration. If the selected fee is 0.00, the check proceeds immediately with no payment step.</div>
     </fieldset>
     </form>
 
@@ -192,16 +191,16 @@ if (currentBrand) document.getElementById('vehicle_brand').value = currentBrand;
 
 <div class="paymodal" id="vprPayModal">
   <div class="paycard">
-    <img src="assets/vpr-logo.png" alt="VPR" style="max-width:260px;width:80%;height:auto">
-    <h2 style="color:#062c52;margin-bottom:4px">Complete Vehicle Check</h2>
+    <?php vpr_page_heading('Complete vehicle check','Secure payment',2,'vprPayTitle'); ?>
     <div class="payprice" id="vprPayPrice">US$0.00</div>
     <p style="margin-top:0" id="vprPayCopy">Continue to Paynow. Your VPR report is released automatically only after Paynow confirms the selected payment.</p>
+    <div id="vprPayOutcome" class="vpr-success" hidden role="status">✓ Payment confirmed by Paynow</div>
     <div id="vprSpinner" class="spinner" style="display:none" aria-hidden="true"></div>
-    <div id="vprProgress" hidden role="status" aria-live="polite"><strong id="vprProgressTitle">Waiting for payment approval</strong><p class="hint">Keep this page open. We check Paynow automatically and open your certificate once payment is verified.</p></div>
+    <div id="vprProgress" hidden role="status" aria-live="polite"><strong id="vprProgressTitle">Waiting for payment approval</strong><p class="hint">Keep this page open. We check Paynow every two seconds. You can complete the checkout after payment is verified.</p></div>
     <div id="vprPayStatus" class="paystatus" role="status" aria-live="polite">Click the payment button to continue securely to Paynow.</div>
     <a id="innbucksOpen" hidden>Open InnBucks app</a>
-    <button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>
-    <button type="button" id="vprClosePay" class="payclose">Back to payment details</button>
+    <div class="vpr-actions"><button type="button" id="vprOpenPaynow"><span id="vprOpenPaynowText">Pay US$0.00 with Paynow</span></button>
+    <button type="button" id="vprClosePay" class="payclose">Back to payment details</button></div>
   </div>
 </div>
 

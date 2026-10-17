@@ -192,7 +192,7 @@ function vpr_poll_payment(PDO $pdo, string $reference, bool $force = false): voi
     $now = time();
     $claim = $pdo->prepare('UPDATE payments SET poll_claim_until=?,last_polled_at=? WHERE merchant_reference=?
         AND COALESCE(poll_claim_until,0) < ? AND COALESCE(last_polled_at,0) <= ?');
-    $claim->execute([$now + 30, $now, $reference, $now, $now - 10]);
+    $claim->execute([$now + 30, $now, $reference, $now, $now - 2]);
     if (!$claim->rowCount()) return;
     try {
         vpr_payment_profile($payment);

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const source = fs.readFileSync(require('node:path').join(__dirname, '../assets/checkout.js'), 'utf8');
 let checks = 0;
 function fixture({saved = null, request = null, blocked = false, fail = false, statusReplies=[]} = {}) {
-  const events = [], nodes = new Map(), store = new Map(), timers=new Map(), requests=[];
+  const events = [], nodes = new Map(), store = new Map(), timers=new Map(), requests=[], delays=[];
   let nextTimer=0;
   if (saved) store.set('vpr.pendingCheckout', JSON.stringify(saved));
   if (request) store.set('vpr.checkoutRequest', JSON.stringify(request));
@@ -25,7 +25,7 @@ function fixture({saved = null, request = null, blocked = false, fail = false, s
   const context = {window, document: {getElementById(id) {if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id);}, createElement: node},
     sessionStorage: {getItem: k => store.get(k), setItem(k, v) {events.push('persist:' + k); store.set(k, v);}, removeItem: k => store.delete(k)},
     FormData: class {constructor() {this.values = Object.entries(fields).map(([k,v]) => [k,v.value]);} entries() {return this.values;} set(k,v) {const found=this.values.find(([n])=>n===k); if(found)found[1]=v;else this.values.push([k,v]);} get(k) {return this.values.find(([n]) => n === k)[1];}},
-    setTimeout: fn => {timers.set(++nextTimer,fn);return nextTimer;}, clearTimeout(id) {timers.delete(id);}, console,
+    setTimeout: (fn,delay) => {delays.push(delay);timers.set(++nextTimer,fn);return nextTimer;}, clearTimeout(id) {timers.delete(id);}, console,
     async fetch(url, options) {
       requests.push({url,method:options.method});
       events.push('fetch:' + url);
@@ -36,7 +36,7 @@ function fixture({saved = null, request = null, blocked = false, fail = false, s
         {ok:true,status:'Pending',paid:false};}};
     }};
   vm.runInNewContext(source, context);
-  return {events, nodes, fields, window, store, requests, timers, async tick(){const first=timers.entries().next().value;if(!first)throw new Error('No automatic check scheduled');timers.delete(first[0]);await first[1]();},click: id => nodes.get(id).handlers.click()};
+  return {events, nodes, fields, window, store, requests, timers, delays, popup, async tick(){const first=timers.entries().next().value;if(!first)throw new Error('No automatic check scheduled');timers.delete(first[0]);await first[1]();},click: id => nodes.get(id).handlers.click()};
 }
 (async function () {
   const stages=fixture();
@@ -77,7 +77,14 @@ function fixture({saved = null, request = null, blocked = false, fail = false, s
   automatic.fields.payment_method.value='ecocash';await automatic.click('vprContinue');await automatic.click('vprPayButton');await automatic.click('vprOpenPaynow');
   assert.equal(automatic.nodes.get('vprSpinner').style.display,'block');assert.equal(automatic.nodes.get('vprOpenPaynow').hidden,true);++checks;
   await automatic.tick();assert.equal(automatic.requests.at(-1).method,'POST');assert(automatic.timers.size>0);++checks;
-  await automatic.tick();assert.equal(automatic.window.location.href,'certificate.php?id=123');assert.equal(automatic.nodes.get('vprSpinner').style.display,'none');assert.equal(automatic.timers.size,0);++checks;
+  await automatic.tick();assert.equal(automatic.window.location.href,'');assert.equal(automatic.nodes.get('vprSpinner').style.display,'none');assert.equal(automatic.timers.size,0);assert.equal(automatic.nodes.get('vprOpenPaynowText').textContent,'Complete');++checks;
+  assert(automatic.delays.every(delay=>delay===2000));assert.equal(automatic.popup.closed,false);++checks;
+  await automatic.click('vprOpenPaynow');assert(automatic.window.location.href.startsWith('payment_success.php?ref=VPR-test&token='));assert(!automatic.window.location.href.includes('certificate.php'));++checks;
+  const hostedSuccess=fixture({statusReplies:[{ok:true,status:'Paid',paid:true,certificate_url:'certificate.php?id=456'}]});
+  await hostedSuccess.click('vprContinue');await hostedSuccess.click('vprPayButton');await hostedSuccess.click('vprOpenPaynow');await new Promise(setImmediate);
+  assert.equal(hostedSuccess.popup.closed,false);assert.equal(hostedSuccess.window.location.href,'');assert.equal(hostedSuccess.nodes.get('vprOpenPaynowText').textContent,'Complete');++checks;
+  const longPending=fixture();longPending.fields.payment_method.value='ecocash';await longPending.click('vprContinue');await longPending.click('vprPayButton');await longPending.click('vprOpenPaynow');
+  for(let i=0;i<65;i++)await longPending.tick();assert.equal(longPending.timers.size,1);assert.equal(longPending.events.filter(x=>x==='fetch:paynow_create.php').length,1);++checks;
   const retrying=fixture({statusReplies:[new Error('Offline'),{ok:true,status:'Cancelled',paid:false}]});
   retrying.fields.payment_method.value='ecocash';await retrying.click('vprContinue');await retrying.click('vprPayButton');await retrying.click('vprOpenPaynow');
   await retrying.tick();assert(retrying.nodes.get('vprPayStatus').textContent.includes('Retrying automatically'));assert(retrying.timers.size>0);++checks;

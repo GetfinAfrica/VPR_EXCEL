@@ -83,15 +83,13 @@ html,body{width:210mm;height:297mm;margin:0!important;padding:0!important;backgr
 .auth{margin-top:5mm}.footer{margin-top:4mm;font-size:9px}
 }
 </style>
-</head>
+<?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head>
 <body>
-<button class="print" onclick="window.print()">Print / Save PDF</button>
+<div class="vpr-actions vpr-print-actions"><button class="print" onclick="window.print()">Print / Save PDF</button><a class="vpr-secondary" href="index.php">New vehicle check</a></div>
 <div class="page">
 <div class="watermark">VPR VERIFIED RECORD</div>
 <div class="content">
-<img class="logo" src="assets/vpr-logo.png" alt="VPR">
-<div class="title">VPR Vehicle Interest Search Report</div>
-<div class="subtitle">Vehicle Pledge Registry</div>
+<header class="vpr-page-heading vpr-report-heading"><div><h1 class="title">Vehicle interest search report</h1><div class="subtitle">Vehicle Pledge Registry</div></div><img class="vpr-brand-logo" src="assets/vpr-logo.png" alt="VPR"></header>
 <div class="rule"></div>
 
 <div class="refbox">

@@ -96,10 +96,10 @@ table{background:#fff}th{background:#eef3f7!important;color:var(--vpr-navy)!impo
 @media(max-width:700px){.vpr-price-grid{grid-template-columns:1fr}.wrap{padding:12px!important}}
 
 </style>
-</head><body>
-<div class="box"><img class="logo" src="assets/vpr-logo.png" alt="VPR"><h2>Administration</h2><p>Private VPR administration access.</p>
+<?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head><body>
+<div class="box"><?php vpr_page_heading('Administration','Private VPR administration access'); ?>
 <?php if($error): ?><p class="err"><?=htmlspecialchars($error)?></p><?php endif;?>
-<form method="post"><input type="password" name="password" placeholder="Admin password" required><button>Login</button></form>
+<form method="post"><input type="password" name="password" placeholder="Admin password" required><div class="vpr-actions"><button>Login</button><a class="vpr-secondary" href="index.php">Vehicle check</a></div></form>
 <p style="text-align:center;margin-top:16px"><a href="recover_admin.php">Forgot / blocked admin password?</a></p>
 </div></body></html>
 <?php exit;
@@ -250,8 +250,8 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VPR Admin</title>
 <style>
 :root{--navy:#062c52;--gold:#b88a26}body{font-family:Arial;background:#f5f7f9;color:#14202b;margin:0}.wrap{max-width:1120px;margin:auto;padding:28px 18px}.logo{max-width:360px;width:100%}.top{display:flex;justify-content:space-between;align-items:center}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.card,.panel{background:#fff;border:1px solid #dfe5ea;border-radius:12px;padding:18px}.num{font-size:28px;font-weight:800;color:var(--navy)}.muted{color:#6b7280;font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{margin-top:16px}input,textarea,select,button{width:100%;padding:10px;margin-top:8px;box-sizing:border-box}button{background:var(--navy);color:#fff;border:0;border-radius:8px;font-weight:700}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid #eee}.ok{color:#166534}.err{color:#b91c1c}.smallbtn{width:auto;padding:8px 10px;background:#991b1b}.viewbtn{display:inline-block;background:var(--navy);color:#fff;text-decoration:none;padding:8px 10px;border-radius:7px;font-size:12px;font-weight:700;white-space:nowrap}.historyform{display:flex;gap:8px;align-items:end}.historyform>div{flex:1}.historyform button{width:auto;min-width:130px}.historysummary{margin:10px 0 0;color:#58636d;font-size:13px}.certref{font-family:monospace;font-size:12px;color:#334155}.result-ok{color:#166534;font-weight:700}.result-warn{color:#991b1b;font-weight:700}.rank{font-weight:800;color:var(--gold)}.footer{text-align:center;margin-top:20px;font-size:12px}.footer a{color:var(--navy);font-weight:700;text-decoration:none}@media(max-width:800px){.cards,.grid{grid-template-columns:1fr}.top{flex-direction:column;align-items:flex-start;gap:10px}.historyform{flex-direction:column;align-items:stretch}.historyform button{width:100%}}
-</style></head><body><div class="wrap">
-<div class="top"><div><img class="logo" src="assets/vpr-logo.png" alt="VPR"><div class="muted">Private administration</div></div><a href="?logout=1">Logout</a></div>
+</style><?php require_once __DIR__.'/ui.php'; vpr_ui_assets(); ?></head><body><div class="wrap">
+<?php vpr_page_heading('Administration','Private vehicle registry management'); ?><div class="vpr-actions vpr-toolbar"><a href="index.php">Vehicle check</a><a class="vpr-secondary" href="?logout=1">Logout</a></div>
 <?php if($message): ?><p class="ok"><?=htmlspecialchars($message)?></p><?php endif;?>
 <?php if($error): ?><p class="err"><?=htmlspecialchars($error)?></p><?php endif;?>
 <div class="cards" style="grid-template-columns:repeat(3,1fr)">
@@ -324,7 +324,7 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
 <div class="muted">Searches in selected period</div>
 </div>
 
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+<div class="vpr-actions">
 <a class="viewbtn" href="traffic_report.php?format=xlsx&amp;stats_class=<?=urlencode($statsClass)?>&amp;stats_period=<?=urlencode($statsPeriod)?>">Download Excel Report</a>
 <a class="viewbtn" href="traffic_report.php?format=pdf&amp;stats_class=<?=urlencode($statsClass)?>&amp;stats_period=<?=urlencode($statsPeriod)?>">Download PDF Report</a>
 </div>
