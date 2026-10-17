@@ -3,3 +3,4 @@
 /data/*.db*
 .env
 .env.*
+/data/vpr.dev.config.php

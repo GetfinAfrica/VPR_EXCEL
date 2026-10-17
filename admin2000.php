@@ -115,13 +115,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'save_pricing') {
         $usd=trim((string)($_POST['price_usd'] ?? ''));
         $zig=trim((string)($_POST['price_zig'] ?? ''));
-        if (!is_numeric($usd) || !is_numeric($zig) || (float)$usd < 0 || (float)$zig < 0) {
+        if (!preg_match('/^(0|[1-9][0-9]{0,8})(?:\.[0-9]{1,2})?$/D', $usd) || !preg_match('/^(0|[1-9][0-9]{0,8})(?:\.[0-9]{1,2})?$/D', $zig)) {
             $error='Prices must be valid numbers equal to or greater than zero.';
         } else {
-            vpr_set_setting($pdo,'price_USD',number_format((float)$usd,2,'.',''));
-            vpr_set_setting($pdo,'price_ZIG',number_format((float)$zig,2,'.',''));
+            $pdo->beginTransaction();
+            vpr_set_setting($pdo,'price_USD',vpr_money_format(vpr_money_minor($usd)));
+            vpr_set_setting($pdo,'price_ZWG',vpr_money_format(vpr_money_minor($zig)));
+            audit_admin('pricing_updated','USD '.$usd.' | ZWG '.$zig);
+            $pdo->commit();
             $message='Public search prices updated successfully.';
-            audit_admin('pricing_updated','USD '.$usd.' | ZiG '.$zig);
+
         }
     }
 
@@ -174,9 +177,12 @@ $searchesToday=(int)$pdo->query("SELECT COUNT(*) FROM searches WHERE date(search
 $totalSearches=(int)$pdo->query("SELECT COUNT(*) FROM searches")->fetchColumn();
 $totalRecords=(int)$pdo->query("SELECT COUNT(*) FROM vehicles")->fetchColumn();
 $activeCount=(int)$pdo->query("SELECT COUNT(*) FROM interests WHERE status='ACTIVE'")->fetchColumn();
-$paidSearches=(int)$pdo->query("SELECT COUNT(*) FROM payments WHERE lower(status) IN ('paid','awaiting delivery','delivered')")->fetchColumn();
-$paidRevenue=(float)$pdo->query("SELECT COALESCE(SUM(CAST(amount AS REAL)),0) FROM payments WHERE lower(status) IN ('paid','awaiting delivery','delivered')")->fetchColumn();
-$recentPayments=$pdo->query("SELECT merchant_reference,paynow_reference,registration_number,amount,currency,status,created_at,paid_at,last_error FROM payments ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+$paidSearches=(int)$pdo->query("SELECT COUNT(*) FROM payments WHERE status='Paid' AND verified_at IS NOT NULL AND search_id IS NOT NULL")->fetchColumn();
+$revenue=['USD'=>0,'ZWG'=>0];
+foreach ($pdo->query("SELECT currency,expected_amount FROM payments WHERE status='Paid' AND verified_at IS NOT NULL AND search_id IS NOT NULL AND reconciliation_note IS NULL")->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    if (isset($revenue[$row['currency']])) $revenue[$row['currency']] += vpr_money_minor($row['expected_amount']);
+}
+$recentPayments=$pdo->query("SELECT merchant_reference,paynow_reference,registration_number,payment_method,amount,expected_amount,provider_amount,currency,provider_currency,integration_id,integration_environment,status,provider_status,reconciliation_note,created_at,paid_at,last_error FROM payments ORDER BY id DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
 
 $searchesWeek=(int)$pdo->query("SELECT COUNT(*) FROM searches WHERE date(searched_at) >= date('now','localtime','-6 days')")->fetchColumn();
 $searchesMonth=(int)$pdo->query("SELECT COUNT(*) FROM searches WHERE strftime('%Y-%m',searched_at)=strftime('%Y-%m','now','localtime')")->fetchColumn();
@@ -256,7 +262,7 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
 <div class="card"><div class="num"><?=$totalRecords?></div><div class="muted">Vehicle records</div></div>
 <div class="card"><div class="num"><?=$activeCount?></div><div class="muted">Active interests</div></div>
 <div class="card"><div class="num"><?=$paidSearches?></div><div class="muted">Paid searches</div></div>
-<div class="card"><div class="num">$<?=number_format($paidRevenue,2)?></div><div class="muted">Paid search revenue</div></div>
+<div class="card"><div class="num">USD <?=htmlspecialchars(vpr_money_format($revenue['USD']))?><br>ZWG <?=htmlspecialchars(vpr_money_format($revenue['ZWG']))?></div><div class="muted">Paid search revenue</div></div>
 </div>
 <div class="grid">
 
@@ -278,7 +284,7 @@ $brands = ["Toyota","Nissan","Honda","Mazda","Mitsubishi","Suzuki","Subaru","Isu
         <div class="vpr-price-note"><strong>0.00 = FREE.</strong> VPR bypasses Paynow and immediately issues the search certificate.</div>
       </div>
       <div class="vpr-price-card">
-        <label>ZiG Price per Search</label>
+        <label>ZiG (ZWG) Price per Search</label>
         <input type="number" name="price_zig" min="0" step="0.01" required value="<?=htmlspecialchars(number_format($zigPrice,2,'.',''))?>">
         <div class="vpr-price-note"><strong>0.00 = FREE.</strong> VPR bypasses Paynow and immediately issues the search certificate.</div>
       </div>
@@ -425,21 +431,22 @@ document.addEventListener('DOMContentLoaded',function(){
 
 <div class="panel">
 <h2>Recent Paynow Transactions</h2>
-<p class="muted">VPR vehicle check fee: <strong>US$1.00 USD</strong>.</p>
+<p class="muted">Current fees: USD <?=htmlspecialchars(vpr_price_amount($pdo,'USD'))?> / ZiG (ZWG) <?=htmlspecialchars(vpr_price_amount($pdo,'ZWG'))?>. Pending transactions retain their original expected fee. Revenue above includes verified transactions without reconciliation flags; legacy payments require separate reconciliation.</p>
 <div style="overflow-x:auto"><table>
-<tr><th>Date</th><th>VPR Ref</th><th>Paynow Ref</th><th>Vehicle</th><th>Amount</th><th>Status</th><th>Error</th></tr>
+<tr><th>Date</th><th>VPR Ref</th><th>Paynow Ref</th><th>Vehicle</th><th>Expected / Reported</th><th>Integration</th><th>Status</th><th>Reconciliation</th></tr>
 <?php foreach($recentPayments as $pmt): ?>
 <tr>
 <td><?=htmlspecialchars($pmt['created_at'])?></td>
 <td><?=htmlspecialchars($pmt['merchant_reference'])?></td>
 <td><?=htmlspecialchars($pmt['paynow_reference'] ?: '-')?></td>
 <td><?=htmlspecialchars($pmt['registration_number'])?></td>
-<td>US$<?=number_format((float)$pmt['amount'],2)?></td>
+<td><?=htmlspecialchars($pmt['currency'])?> <?=htmlspecialchars($pmt['expected_amount'] ?? 'Legacy: unknown')?><br><?=htmlspecialchars($pmt['provider_amount'] ?? '-')?> <?=htmlspecialchars($pmt['provider_currency'] ?? 'profile-bound')?></td>
+<td><?=htmlspecialchars($pmt['integration_id'] ?? 'legacy')?> / <?=htmlspecialchars($pmt['integration_environment'] ?? 'unknown')?><br><?=htmlspecialchars($pmt['payment_method'] ?? 'hosted')?></td>
 <td><?=htmlspecialchars($pmt['status'])?></td>
-<td><?=htmlspecialchars($pmt['last_error'] ?: '-')?></td>
+<td><?=htmlspecialchars($pmt['reconciliation_note'] ?: ($pmt['last_error'] ?: '-'))?></td>
 </tr>
 <?php endforeach; ?>
-<?php if(!$recentPayments): ?><tr><td colspan="7">No Paynow transactions yet.</td></tr><?php endif;?>
+<?php if(!$recentPayments): ?><tr><td colspan="8">No Paynow transactions yet.</td></tr><?php endif;?>
 </table></div>
 </div>
 
@@ -451,8 +458,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <tr><td>PHP cURL</td><td><?=function_exists('curl_init')?'Available':'Not available'?></td></tr>
 <tr><td>allow_url_fopen</td><td><?=in_array(strtolower((string)ini_get('allow_url_fopen')),['1','on','yes','true'],true)?'Enabled':'Disabled'?></td></tr>
 <tr><td>OpenSSL</td><td><?=extension_loaded('openssl')?'Available':'MISSING'?></td></tr>
-<tr><td>Paynow Integration ID</td><td><?=htmlspecialchars(VPR_PAYNOW_INTEGRATION_ID)?></td></tr>
-<tr><td>Currency</td><td><?=htmlspecialchars(VPR_SEARCH_CURRENCY)?> <?=htmlspecialchars(VPR_SEARCH_FEE)?></td></tr>
+<?php foreach (['USD','ZWG'] as $ccy): $profile=vpr_paynow_profile($ccy,false); ?><tr><td><?=htmlspecialchars($ccy)?> checkout</td><td><?=htmlspecialchars($profile['id'] ?: 'Not configured')?> / <?=htmlspecialchars($profile['environment'] ?: 'unknown')?> / <?=($profile['enabled'] && $profile['confirmed']) ? 'Enabled and currency confirmed' : 'Disabled or unconfirmed'?></td></tr><?php endforeach;?>
 </table>
 <p class="muted">At least one of PHP cURL or allow_url_fopen must be available for VPR to contact Paynow.</p>
 </div>
